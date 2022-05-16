@@ -60,23 +60,9 @@ contract DebondBond is IDebondBond, AccessControl {
 
     bool public _isActive;
 
-    constructor(
-        address DBIT,
-        address USDC,
-        address USDT,
-        address DAI
-    ) {
+    constructor() {
         _isActive = true;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _createClass(0, "D/BIT", IData.InterestRateType.FixedRate, DBIT, 60);
-        _createClass(1, "USDC", IData.InterestRateType.FixedRate, USDC, 60);
-        _createClass(2, "USDT", IData.InterestRateType.FixedRate, USDT, 60);
-        _createClass(3, "DAI", IData.InterestRateType.FixedRate, DAI, 60);
-
-        _createClass(4, "D/BIT", IData.InterestRateType.FloatingRate, DBIT, 60);
-        _createClass(5, "USDC", IData.InterestRateType.FloatingRate, DAI, 60);
-        _createClass(6, "USDT", IData.InterestRateType.FloatingRate, DAI, 60);
-        _createClass(7, "DAI", IData.InterestRateType.FloatingRate, DAI, 60);
     }
 
 

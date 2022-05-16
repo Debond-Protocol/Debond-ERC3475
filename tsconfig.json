@@ -14,6 +14,6 @@
     "typeRoots": ["./node_modules/@types", "./types"],
     "types": ["node", "truffle-contracts"]
   },
-  "include": ["**/*.ts", "test/mockGovernance.js"],
+  "include": ["**/*.ts"],
   "exclude": ["node_modules", "example", "build"]
 }
