@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 // SPDX-License-Identifier: MIT
 
 interface IERC3475 {
-    // WRITE
 
     /**
      * @dev allows the transfer of a bond type from an address to another.
