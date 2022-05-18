@@ -39,7 +39,7 @@ contract DebondBond is IDebondBond, AccessControl {
         bool exists;
         string symbol;
         uint256[] infos;
-        IData.InterestRateType interestRateType;
+        InterestRateType interestRateType;
         address tokenAddress;
         uint256 periodTimestamp;
         mapping(address => mapping(uint256 => bool)) noncesPerAddress;
@@ -54,7 +54,7 @@ contract DebondBond is IDebondBond, AccessControl {
     mapping(address => mapping(uint256 => bool)) classesPerAddress;
     mapping(address => uint256[]) public classesPerAddressArray;
 
-    mapping(address => mapping(IData.InterestRateType => uint256)) bondsDue;
+    mapping(address => mapping(InterestRateType => uint256)) bondsDue;
     mapping(address => mapping(address => bool)) operatorApprovals;
 
 
@@ -98,7 +98,7 @@ contract DebondBond is IDebondBond, AccessControl {
 
         Nonce storage nonce = class.nonces[nonceId];
         bondsDue[class.tokenAddress][class.interestRateType] += amount;
-        nonce.tokenLiquidity = bondsDue[class.tokenAddress][IData.InterestRateType.FixedRate] + bondsDue[class.tokenAddress][IData.InterestRateType.FloatingRate];
+        nonce.tokenLiquidity = bondsDue[class.tokenAddress][InterestRateType.FixedRate] + bondsDue[class.tokenAddress][InterestRateType.FloatingRate];
         emit Issue(msg.sender, to, classId, nonceId, amount);
     }
 
@@ -110,11 +110,11 @@ contract DebondBond is IDebondBond, AccessControl {
         return classes[classId].nonces[nonceId].exists;
     }
 
-    function createClass(uint256 classId, string memory _symbol, IData.InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) public override onlyRole(ISSUER_ROLE) {
+    function createClass(uint256 classId, string memory _symbol, InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) public override onlyRole(ISSUER_ROLE) {
         _createClass(classId, _symbol, interestRateType, tokenAddress, periodTimestamp);
     }
 
-    function _createClass(uint256 classId, string memory _symbol, IData.InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) private {
+    function _createClass(uint256 classId, string memory _symbol, InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) private {
         require(!classExists(classId), "ERC3475: cannot create a class that already exists");
         Class storage class = classes[classId];
         class.id = classId;
@@ -221,7 +221,7 @@ contract DebondBond is IDebondBond, AccessControl {
         return classes[classId].nonces[nonceId].infos;
     }
 
-    function bondDetails(uint256 classId, uint256 nonceId) public view override returns (string memory _symbol, IData.InterestRateType _interestRateType, address _tokenAddress, uint256 _periodTimestamp, uint256 _issuanceDate, uint256 _maturityDate, uint256 _tokenLiquidity) {
+    function bondDetails(uint256 classId, uint256 nonceId) public view override returns (string memory _symbol, InterestRateType _interestRateType, address _tokenAddress, uint256 _periodTimestamp, uint256 _issuanceDate, uint256 _maturityDate, uint256 _tokenLiquidity) {
         Class storage class = classes[classId];
         Nonce storage nonce = class.nonces[nonceId];
 
@@ -237,7 +237,7 @@ contract DebondBond is IDebondBond, AccessControl {
     }
 
     function totalActiveSupply(address tokenAddress) external view returns (uint256) {
-        return bondsDue[tokenAddress][IData.InterestRateType.FloatingRate] + bondsDue[tokenAddress][IData.InterestRateType.FixedRate];
+        return bondsDue[tokenAddress][InterestRateType.FloatingRate] + bondsDue[tokenAddress][InterestRateType.FixedRate];
     }
 
 
@@ -252,11 +252,11 @@ contract DebondBond is IDebondBond, AccessControl {
 
     function isRedeemable(uint256 classId, uint256 nonceId) public override view returns (bool) {
         Class storage class = classes[classId];
-        if (class.interestRateType == IData.InterestRateType.FixedRate) {
+        if (class.interestRateType == InterestRateType.FixedRate) {
             return classes[classId].nonces[nonceId].maturityDate <= block.timestamp;
         }
 
-        if (class.interestRateType == IData.InterestRateType.FloatingRate) {
+        if (class.interestRateType == InterestRateType.FloatingRate) {
             return true;
         }
         return false;
@@ -273,7 +273,7 @@ contract DebondBond is IDebondBond, AccessControl {
         return operatorApprovals[owner][operator];
     }
 
-    function bondAmountDue(address tokenAddress, IData.InterestRateType interestRateType) external view returns (uint256) {
+    function bondAmountDue(address tokenAddress, InterestRateType interestRateType) external view returns (uint256) {
         return bondsDue[tokenAddress][interestRateType];
     }
 

@@ -16,24 +16,25 @@ pragma solidity ^0.8.0;
 */
 
 import "./IERC3475.sol";
-import "./IData.sol";
 
 
 interface IDebondBond is IERC3475 {
 
+    enum InterestRateType {FixedRate, FloatingRate}
+
     function isActive() external returns (bool);
 
-    function bondAmountDue(address tokenAddress, IData.InterestRateType interestRateType) external view returns (uint);
+    function bondAmountDue(address tokenAddress, InterestRateType interestRateType) external view returns (uint);
 
     function createNonce(uint256 classId, uint256 nonceId, uint256 maturityTime) external;
 
-    function createClass(uint256 classId, string memory symbol, IData.InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) external;
+    function createClass(uint256 classId, string memory symbol, InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) external;
 
     function classExists(uint256 classId) external view returns (bool);
 
     function nonceExists(uint256 classId, uint256 nonceId) external view returns (bool);
 
-    function bondDetails(uint256 classId, uint256 nonceId) external view returns (string memory _symbol, IData.InterestRateType _interestRateType, address _tokenAddress, uint256 _periodTimestamp, uint256 _maturityDate, uint256 _issuanceDate, uint256 _tokenLiquidity);
+    function bondDetails(uint256 classId, uint256 nonceId) external view returns (string memory _symbol, InterestRateType _interestRateType, address _tokenAddress, uint256 _periodTimestamp, uint256 _maturityDate, uint256 _issuanceDate, uint256 _tokenLiquidity);
 
     function totalActiveSupply(address tokenAddress) external view returns (uint256);
 
