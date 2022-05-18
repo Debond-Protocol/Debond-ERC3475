@@ -15,14 +15,10 @@ pragma solidity ^0.8.0;
     limitations under the License.
 */
 
-import "./IERC3475.sol";
 
-
-interface IDebondBond is IERC3475 {
+interface IDebondBond {
 
     enum InterestRateType {FixedRate, FloatingRate}
-
-    function isActive() external returns (bool);
 
     function bondAmountDue(address tokenAddress, InterestRateType interestRateType) external view returns (uint);
 
@@ -37,6 +33,10 @@ interface IDebondBond is IERC3475 {
     function bondDetails(uint256 classId, uint256 nonceId) external view returns (string memory _symbol, InterestRateType _interestRateType, address _tokenAddress, uint256 _periodTimestamp, uint256 _maturityDate, uint256 _issuanceDate, uint256 _tokenLiquidity);
 
     function totalActiveSupply(address tokenAddress) external view returns (uint256);
+
+    function getLastNonceCreated(uint classId) external view returns(uint nonceId, uint createdAt);
+
+    function updateLastNonce(uint classId, uint nonceId, uint createdAt) external;
 
 
 }
