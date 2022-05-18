@@ -114,7 +114,7 @@ contract DebondBond is IDebondBond, AccessControl {
         _createClass(classId, _symbol, interestRateType, tokenAddress, periodTimestamp);
     }
 
-    function _createClass(uint256 classId, string memory _symbol, InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) private {
+    function _createClass(uint256 classId, string memory _symbol, InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) internal {
         require(!classExists(classId), "ERC3475: cannot create a class that already exists");
         Class storage class = classes[classId];
         class.id = classId;
@@ -322,32 +322,32 @@ contract DebondBond is IDebondBond, AccessControl {
         return _batchTotalSupply;
     }
 
-    function _transferFrom(address from, address to, uint256 classId, uint256 nonceId, uint256 amount) private {
+    function _transferFrom(address from, address to, uint256 classId, uint256 nonceId, uint256 amount) internal {
         require(from != address(0), "ERC3475: can't transfer from the zero address");
         require(to != address(0), "ERC3475: can't transfer to the zero address");
         require(classes[classId].nonces[nonceId].balances[from] >= amount, "ERC3475: not enough bond to transfer");
         _transfer(from, to, classId, nonceId, amount);
     }
 
-    function _transfer(address from, address to, uint256 classId, uint256 nonceId, uint256 amount) private {
+    function _transfer(address from, address to, uint256 classId, uint256 nonceId, uint256 amount) internal {
         require(from != to, "ERC3475: can't transfer to the same address");
         classes[classId].nonces[nonceId].balances[from] -= amount;
         classes[classId].nonces[nonceId].balances[to] += amount;
     }
 
-    function _issue(address to, uint256 classId, uint256 nonceId, uint256 amount) private {
+    function _issue(address to, uint256 classId, uint256 nonceId, uint256 amount) internal {
         classes[classId].nonces[nonceId].balances[to] += amount;
         classes[classId].nonces[nonceId]._activeSupply += amount;
     }
 
-    function _redeem(address from, uint256 classId, uint256 nonceId, uint256 amount) private {
+    function _redeem(address from, uint256 classId, uint256 nonceId, uint256 amount) internal {
         require(classes[classId].nonces[nonceId].balances[from] >= amount);
         classes[classId].nonces[nonceId].balances[from] -= amount;
         classes[classId].nonces[nonceId]._activeSupply -= amount;
         classes[classId].nonces[nonceId]._redeemedSupply += amount;
     }
 
-    function _burn(address from, uint256 classId, uint256 nonceId, uint256 amount) private {
+    function _burn(address from, uint256 classId, uint256 nonceId, uint256 amount) internal {
         require(classes[classId].nonces[nonceId].balances[from] >= amount);
         classes[classId].nonces[nonceId].balances[from] -= amount;
         classes[classId].nonces[nonceId]._activeSupply -= amount;
