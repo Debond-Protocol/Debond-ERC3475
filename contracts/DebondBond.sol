@@ -10,6 +10,7 @@ import "./DebondERC3475.sol";
 
 contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
 
+    mapping(address => mapping(IDebondBond.InterestRateType => uint256)) rateTypeTotalSupply;
 
     constructor(address governanceAddress) GovernanceOwnable(governanceAddress) { }
 
@@ -22,6 +23,29 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
 
     function nonceExists(uint256 classId, uint256 nonceId) public view returns (bool) {
         return classes[classId].nonces[nonceId].exists;
+    }
+
+    function issue(address to, uint256 classId, uint256 nonceId, uint256 amount) external override onlyRole(ISSUER_ROLE) {
+        require(classes[classId].exists, "ERC3475: only issue bond that has been created");
+        require(classes[classId].nonces[nonceId].exists, "ERC-3475: nonceId given not found!");
+        require(to != address(0), "ERC3475: can't transfer to the zero address");
+        _issue(to, classId, nonceId, amount);
+
+        if (!classesPerAddress[to][classId]) {
+            classesPerAddressArray[to].push(classId);
+            classesPerAddress[to][classId] = true;
+        }
+
+        Class storage class = classes[classId];
+        if (!class.noncesPerAddress[to][nonceId]) {
+            class.noncesPerAddressArray[to].push(nonceId);
+            class.noncesPerAddress[to][nonceId] = true;
+        }
+
+        Nonce storage nonce = class.nonces[nonceId];
+        rateTypeTotalSupply[class.tokenAddress][class.interestRateType] += amount;
+        nonce.tokenLiquidity = tokenAddressTotalSupply(class.tokenAddress);
+        emit Issue(msg.sender, to, classId, nonceId, amount);
     }
 
     function createClass(uint256 classId, string memory _symbol, InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) public override onlyGovernance {
@@ -75,8 +99,8 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
         return (_symbol, _interestRateType, _tokenAddress, _periodTimestamp, _issuanceDate, _maturityDate, _tokenLiquidity);
     }
 
-    function totalActiveSupply(address tokenAddress) external view returns (uint256) {
-        return bondsDue[tokenAddress][InterestRateType.FloatingRate] + bondsDue[tokenAddress][InterestRateType.FixedRate];
+    function tokenAddressTotalSupply(address tokenAddress) public view returns (uint256) {
+        return rateTypeTotalSupply[tokenAddress][InterestRateType.FloatingRate] + rateTypeTotalSupply[tokenAddress][InterestRateType.FixedRate];
     }
 
     function isRedeemable(uint256 classId, uint256 nonceId) public override view returns (bool) {
@@ -93,7 +117,7 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
     }
 
     function bondAmountDue(address tokenAddress, InterestRateType interestRateType) external view returns (uint256) {
-        return bondsDue[tokenAddress][interestRateType];
+        return rateTypeTotalSupply[tokenAddress][interestRateType];
     }
 
     function getLastNonceCreated(uint classId) external view returns(uint nonceId, uint createdAt) {

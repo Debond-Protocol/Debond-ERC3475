@@ -32,7 +32,7 @@ interface IDebondBond {
 
     function bondDetails(uint256 classId, uint256 nonceId) external view returns (string memory _symbol, InterestRateType _interestRateType, address _tokenAddress, uint256 _periodTimestamp, uint256 _maturityDate, uint256 _issuanceDate, uint256 _tokenLiquidity);
 
-    function totalActiveSupply(address tokenAddress) external view returns (uint256);
+    function tokenAddressTotalSupply(address tokenAddress) external view returns (uint256);
 
     function getLastNonceCreated(uint classId) external view returns(uint nonceId, uint createdAt);
 

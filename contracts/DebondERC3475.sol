@@ -60,9 +60,6 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
     mapping(address => mapping(uint256 => bool)) classesPerAddress;
     mapping(address => uint256[]) public classesPerAddressArray;
 
-    mapping(address => mapping(IDebondBond.InterestRateType => uint256)) bondsDue;
-
-
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
@@ -77,28 +74,6 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
     }
 
 
-    function issue(address to, uint256 classId, uint256 nonceId, uint256 amount) external override onlyRole(ISSUER_ROLE) {
-        require(classes[classId].exists, "ERC3475: only issue bond that has been created");
-        require(classes[classId].nonces[nonceId].exists, "ERC-3475: nonceId given not found!");
-        require(to != address(0), "ERC3475: can't transfer to the zero address");
-        _issue(to, classId, nonceId, amount);
-
-        if (!classesPerAddress[to][classId]) {
-            classesPerAddressArray[to].push(classId);
-            classesPerAddress[to][classId] = true;
-        }
-
-        Class storage class = classes[classId];
-        if (!class.noncesPerAddress[to][nonceId]) {
-            class.noncesPerAddressArray[to].push(nonceId);
-            class.noncesPerAddress[to][nonceId] = true;
-        }
-
-        Nonce storage nonce = class.nonces[nonceId];
-        bondsDue[class.tokenAddress][class.interestRateType] += amount;
-        nonce.tokenLiquidity = bondsDue[class.tokenAddress][IDebondBond.InterestRateType.FixedRate] + bondsDue[class.tokenAddress][IDebondBond.InterestRateType.FloatingRate];
-        emit Issue(msg.sender, to, classId, nonceId, amount);
-    }
 
     function redeem(address from, uint256 classId, uint256 nonceId, uint256 amount) external override onlyRole(ISSUER_ROLE) {
         require(classes[classId].nonces[nonceId].exists, "ERC3475: given Nonce doesn't exist");
@@ -106,8 +81,6 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
         require(isRedeemable(classId, nonceId), "Bond is not redeemable");
         _redeem(from, classId, nonceId, amount);
         Class storage class = classes[classId];
-        bondsDue[class.tokenAddress][class.interestRateType] -= amount;
-        class.nonces[nonceId].tokenLiquidity -= amount;
         emit Redeem(msg.sender, from, classId, nonceId, amount);
     }
 
@@ -116,7 +89,6 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
         require(from != address(0), "ERC3475: can't transfer to the zero address");
         _burn(from, classId, nonceId, amount);
         Class storage class = classes[classId];
-        bondsDue[class.tokenAddress][class.interestRateType] -= amount;
         emit Burn(msg.sender, from, classId, nonceId, amount);
     }
 
@@ -143,7 +115,7 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
 
 
     function totalSupply(uint256 classId, uint256 nonceId) public override view returns (uint256) {
-        return classes[classId].nonces[nonceId]._activeSupply + classes[classId].nonces[nonceId]._redeemedSupply + classes[classId].nonces[nonceId]._burnedSupply;
+        return classes[classId].nonces[nonceId]._activeSupply + classes[classId].nonces[nonceId]._redeemedSupply;
     }
 
 
@@ -193,9 +165,7 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
     }
 
 
-    function isRedeemable(uint256 classId, uint256 nonceId) public virtual override view returns (bool) {
-        return false;
-    }
+    function isRedeemable(uint256 classId, uint256 nonceId) public virtual override view returns (bool);
 
     function allowance(address owner, address spender, uint256 classId, uint256 nonceId) external view returns (uint256) {
         return classes[classId].nonces[nonceId].allowances[owner][spender];
