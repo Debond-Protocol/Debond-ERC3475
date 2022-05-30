@@ -26,11 +26,10 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
         uint256 _redeemedSupply;
         uint256 maturityDate;
         uint256 issuanceDate;
-        uint256 tokenLiquidity;
+        uint256 classLiquidity;
         uint256[] infos;
         mapping(address => uint256) balances;
         mapping(address => mapping(address => uint256)) allowances;
-        mapping(address => bool) hasBalance;
     }
 
     /**
@@ -45,6 +44,7 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
         IDebondBond.InterestRateType interestRateType;
         address tokenAddress;
         uint256 periodTimestamp;
+        uint256 liquidity;
         mapping(address => mapping(uint256 => bool)) noncesPerAddress;
         mapping(address => uint256[]) noncesPerAddressArray;
         mapping(address => mapping(address => bool)) operatorApprovals;
@@ -57,8 +57,8 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
     mapping(uint256 => Class) internal classes; // from classId given
     string[] public classInfoDescriptions; // mapping with class.infos
     string[] public nonceInfoDescriptions; // mapping with nonce.infos
-    mapping(address => mapping(uint256 => bool)) classesPerAddress;
-    mapping(address => uint256[]) public classesPerAddressArray;
+    mapping(address => mapping(uint256 => bool)) classesPerHolder;
+    mapping(address => uint256[]) public classesPerHolderArray;
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -80,7 +80,6 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
         require(from != address(0), "ERC3475: can't transfer to the zero address");
         require(isRedeemable(classId, nonceId), "Bond is not redeemable");
         _redeem(from, classId, nonceId, amount);
-        Class storage class = classes[classId];
         emit Redeem(msg.sender, from, classId, nonceId, amount);
     }
 
@@ -88,7 +87,6 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
     function burn(address from, uint256 classId, uint256 nonceId, uint256 amount) external override onlyRole(ISSUER_ROLE) {
         require(from != address(0), "ERC3475: can't transfer to the zero address");
         _burn(from, classId, nonceId, amount);
-        Class storage class = classes[classId];
         emit Burn(msg.sender, from, classId, nonceId, amount);
     }
 

@@ -4,6 +4,7 @@
 pragma solidity ^0.8.0;
 
 import "./interfaces/IDebondBond.sol";
+import "./interfaces/IRedeemableBondCalculator.sol";
 import "debond-governance/contracts/utils/GovernanceOwnable.sol";
 import "./DebondERC3475.sol";
 
@@ -11,8 +12,15 @@ import "./DebondERC3475.sol";
 contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
 
     mapping(address => mapping(IDebondBond.InterestRateType => uint256)) rateTypeTotalSupply;
+    mapping(address => uint256[]) classIdsPerTokenAddress;
+    address redeemableBondCalculatorAddress;
 
-    constructor(address governanceAddress) GovernanceOwnable(governanceAddress) { }
+    constructor(
+        address _governanceAddress,
+        address _redeemableBondCalculatorAddress
+    ) GovernanceOwnable(_governanceAddress) {
+        redeemableBondCalculatorAddress = _redeemableBondCalculatorAddress;
+    }
 
 
     // WRITE
@@ -31,9 +39,9 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
         require(to != address(0), "ERC3475: can't transfer to the zero address");
         _issue(to, classId, nonceId, amount);
 
-        if (!classesPerAddress[to][classId]) {
-            classesPerAddressArray[to].push(classId);
-            classesPerAddress[to][classId] = true;
+        if (!classesPerHolder[to][classId]) {
+            classesPerHolderArray[to].push(classId);
+            classesPerHolder[to][classId] = true;
         }
 
         Class storage class = classes[classId];
@@ -44,12 +52,14 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
 
         Nonce storage nonce = class.nonces[nonceId];
         rateTypeTotalSupply[class.tokenAddress][class.interestRateType] += amount;
-        nonce.tokenLiquidity = tokenAddressTotalSupply(class.tokenAddress);
+        nonce.classLiquidity = class.liquidity + amount;
+        class.liquidity += amount;
         emit Issue(msg.sender, to, classId, nonceId, amount);
     }
 
     function createClass(uint256 classId, string memory _symbol, InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) public override onlyGovernance {
         _createClass(classId, _symbol, interestRateType, tokenAddress, periodTimestamp);
+        classIdsPerTokenAddress[tokenAddress].push(classId);
     }
 
     function _createClass(uint256 classId, string memory _symbol, InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) internal {
@@ -82,7 +92,16 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
         class.lastNonceIdCreated = nonceId;
         class.lastNonceIdCreatedTimestamp = createdAt;
     }
+
+    function setRedeemableBondCalculatorAddress(address _redeemableBondCalculatorAddress) external onlyGovernance {
+        require(_redeemableBondCalculatorAddress != address(0), "null Address given");
+        redeemableBondCalculatorAddress = _redeemableBondCalculatorAddress;
+    }
     // READS
+
+    function getClassesPerTokenAddress(address tokenAddress) external view returns (uint256[] memory) {
+        return classesPerHolderArray[tokenAddress];
+    }
 
     function bondDetails(uint256 classId, uint256 nonceId) public view override returns (string memory _symbol, InterestRateType _interestRateType, address _tokenAddress, uint256 _periodTimestamp, uint256 _issuanceDate, uint256 _maturityDate, uint256 _tokenLiquidity) {
         Class storage class = classes[classId];
@@ -94,7 +113,7 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
         _periodTimestamp = class.periodTimestamp;
         _issuanceDate = nonce.issuanceDate;
         _maturityDate = nonce.maturityDate;
-        _tokenLiquidity = nonce.tokenLiquidity;
+        _tokenLiquidity = nonce.classLiquidity;
 
         return (_symbol, _interestRateType, _tokenAddress, _periodTimestamp, _issuanceDate, _maturityDate, _tokenLiquidity);
     }
@@ -104,15 +123,7 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
     }
 
     function isRedeemable(uint256 classId, uint256 nonceId) public override view returns (bool) {
-        Class storage class = classes[classId];
-        if (class.interestRateType == InterestRateType.FixedRate) {
-            return classes[classId].nonces[nonceId].maturityDate <= block.timestamp;
-        }
-
-        if (class.interestRateType == InterestRateType.FloatingRate) {
-            return true;
-        }
-        return false;
+        return IRedeemableBondCalculator(redeemableBondCalculatorAddress).isRedeemable(classId, nonceId);
 
     }
 

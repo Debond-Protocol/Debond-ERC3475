@@ -1,6 +1,6 @@
 const DebondBond = artifacts.require("DebondBond");
 
 module.exports = async function (deployer, networks, accounts) {
-  const fakeGovernanceAddress = accounts[0]
-  await deployer.deploy(DebondBond, fakeGovernanceAddress)
+  const governanceAddress = accounts[1]
+  await deployer.deploy(DebondBond, governanceAddress)
 };

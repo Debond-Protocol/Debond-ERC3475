@@ -26,6 +26,12 @@ interface IDebondBond {
 
     function createClass(uint256 classId, string memory symbol, InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) external;
 
+    function setRedeemableBondCalculatorAddress(address _redeemableBondCalculatorAddress) external;
+
+    function updateLastNonce(uint classId, uint nonceId, uint createdAt) external;
+
+
+
     function classExists(uint256 classId) external view returns (bool);
 
     function nonceExists(uint256 classId, uint256 nonceId) external view returns (bool);
@@ -36,8 +42,6 @@ interface IDebondBond {
 
     function getLastNonceCreated(uint classId) external view returns(uint nonceId, uint createdAt);
 
-    function updateLastNonce(uint classId, uint nonceId, uint createdAt) external;
-
-
+    function getClassesPerTokenAddress(address tokenAddress) external view returns (uint256[] memory);
 }
 

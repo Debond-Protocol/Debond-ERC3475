@@ -10,7 +10,7 @@ contract('Bond', async (accounts: string[]) => {
 
     let DBIT_FIX_6MTH_CLASS_ID: number;
     let USDC_FIX_6MTH_CLASS_ID: number;
-    let [owner, issuerEntity, buyer, falseIssuerEntity] = accounts;
+    let [owner, governance, issuerEntity, buyer, falseIssuerEntity, DBITAddress, USDCAddress] = accounts;
 
     it('Initialisation', async () => {
         bondContract = await DebondBond.deployed();
@@ -24,7 +24,12 @@ contract('Bond', async (accounts: string[]) => {
 
     })
 
-    it('Only Issuer can create new nonces', async () => {
+    it('Only Governance can create new classes', async () => {
+        await bondContract.createClass(DBIT_FIX_6MTH_CLASS_ID, "DBIT", 0, DBITAddress, 3600 * 24 * 30, {from: governance});
+
+    })
+
+    it('Only Address with Issuer Role can create new nonces', async () => {
         try {
             await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 0, Date.now() + 10000, {from: falseIssuerEntity});
         } catch (e: any) {
