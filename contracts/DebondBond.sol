@@ -11,9 +11,10 @@ import "./DebondERC3475.sol";
 
 contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
 
-    mapping(address => mapping(IDebondBond.InterestRateType => uint256)) rateTypeTotalSupply;
-    mapping(address => uint256[]) classIdsPerTokenAddress;
     address redeemableBondCalculatorAddress;
+
+    mapping(address => mapping(IDebondBond.InterestRateType => uint256)) tokenRateTypeTotalSupply; // needed for interest rate calculation also
+    mapping(address => uint256[]) classIdsPerTokenAddress;
 
     constructor(
         address _governanceAddress,
@@ -45,15 +46,16 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
         }
 
         Class storage class = classes[classId];
+        class.liquidity += amount;
+        tokenRateTypeTotalSupply[class.tokenAddress][class.interestRateType] += amount;
+
         if (!class.noncesPerAddress[to][nonceId]) {
             class.noncesPerAddressArray[to].push(nonceId);
             class.noncesPerAddress[to][nonceId] = true;
         }
 
         Nonce storage nonce = class.nonces[nonceId];
-        rateTypeTotalSupply[class.tokenAddress][class.interestRateType] += amount;
         nonce.classLiquidity = class.liquidity + amount;
-        class.liquidity += amount;
         emit Issue(msg.sender, to, classId, nonceId, amount);
     }
 
@@ -118,8 +120,8 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
         return (_symbol, _interestRateType, _tokenAddress, _periodTimestamp, _issuanceDate, _maturityDate, _tokenLiquidity);
     }
 
-    function tokenAddressTotalSupply(address tokenAddress) public view returns (uint256) {
-        return rateTypeTotalSupply[tokenAddress][InterestRateType.FloatingRate] + rateTypeTotalSupply[tokenAddress][InterestRateType.FixedRate];
+    function tokenTotalSupply(address tokenAddress) public view returns (uint256) {
+        return tokenRateTypeTotalSupply[tokenAddress][InterestRateType.FloatingRate] + tokenRateTypeTotalSupply[tokenAddress][InterestRateType.FixedRate];
     }
 
     function isRedeemable(uint256 classId, uint256 nonceId) public override view returns (bool) {
@@ -128,16 +130,40 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
     }
 
     function bondAmountDue(address tokenAddress, InterestRateType interestRateType) external view returns (uint256) {
-        return rateTypeTotalSupply[tokenAddress][interestRateType];
+        return tokenRateTypeTotalSupply[tokenAddress][interestRateType];
     }
 
-    function getLastNonceCreated(uint classId) external view returns(uint nonceId, uint createdAt) {
+    function getLastNonceCreated(uint classId) external view returns (uint nonceId, uint createdAt) {
         Class storage class = classes[classId];
         require(class.exists, "Debond Data: class id given not found");
         nonceId = class.lastNonceIdCreated;
         createdAt = class.lastNonceIdCreatedTimestamp;
         return (nonceId, createdAt);
     }
+
+    function tokenLiquidityFlow(address tokenAddress, uint256 nonceNumber, uint256 fromDate) external view returns (uint256) {
+        uint liquidityIn;
+        uint nonceFromDate = IRedeemableBondCalculator.getNonceFromDate(fromDate);
+        for (uint i = nonceFromDate; i >= nonceFromDate - nonceNumber; i-- ) {
+            for (uint j = 0; j < classIdsPerTokenAddress.length; j++ ) {
+                Nonce storage nonce = classes[classIdsPerTokenAddress[j]].nonces[i];
+                liquidityIn += (nonce._activeSupply + nonce._redeemedSupply);
+            }
+        }
+        return liquidityIn;
+    }
+
+    function tokenSupplyAtNonce(address tokenAddress, uint256 nonceId) external view returns (uint256) {
+        uint supply;
+        for (uint i = 0; i < classIdsPerTokenAddress.length; i++ ) {
+            Class storage class = classes[classIdsPerTokenAddress[i]];
+            Nonce storage nonce = class.nonces[nonceId];
+            supply += !nonce.exists ? class.nonces[class.lastNonceIdCreated].classLiquidity : nonce.classLiquidity;
+        }
+        return supply;
+    }
+
+
 
     function getNoncesPerAddress(address addr, uint256 classId) public view returns (uint256[] memory) {
         return classes[classId].noncesPerAddressArray[addr];
