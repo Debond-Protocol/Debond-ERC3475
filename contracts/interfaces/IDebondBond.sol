@@ -40,7 +40,7 @@ interface IDebondBond {
 
     function tokenTotalSupply(address tokenAddress) external view returns (uint256);
 
-    function tokenLiquidityFlow(address tokenAddress, uint256 nonceNumber, uint256 fromDate) external view returns (uint256);
+    function supplyIssuedOnPeriod(address tokenAddress, uint256 fromNonceId, uint256 toNonceId) external view returns (uint256);
 
     function tokenSupplyAtNonce(address tokenAddress, uint256 nonceId) external view returns (uint256);
 

@@ -14,6 +14,7 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
     address redeemableBondCalculatorAddress;
 
     mapping(address => mapping(IDebondBond.InterestRateType => uint256)) tokenRateTypeTotalSupply; // needed for interest rate calculation also
+    mapping(address => mapping(uint256 => uint256)) tokenTotalSupplyAtNonce;
     mapping(address => uint256[]) classIdsPerTokenAddress;
 
     constructor(
@@ -47,6 +48,7 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
 
         Class storage class = classes[classId];
         class.liquidity += amount;
+        tokenTotalSupplyAtNonce[class.tokenAddress][nonceId] = tokenTotalSupply(class.tokenAddress) + amount;
         tokenRateTypeTotalSupply[class.tokenAddress][class.interestRateType] += amount;
 
         if (!class.noncesPerAddress[to][nonceId]) {
@@ -107,7 +109,9 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
 
     function bondDetails(uint256 classId, uint256 nonceId) public view override returns (string memory _symbol, InterestRateType _interestRateType, address _tokenAddress, uint256 _periodTimestamp, uint256 _issuanceDate, uint256 _maturityDate, uint256 _tokenLiquidity) {
         Class storage class = classes[classId];
+        require(class.exists, "given class is not found");
         Nonce storage nonce = class.nonces[nonceId];
+        require(nonce.exists, "No issuance for the given nonce on that class");
 
         _symbol = class.symbol;
         _interestRateType = class.interestRateType;
@@ -141,28 +145,23 @@ contract DebondBond is DebondERC3475, IDebondBond, GovernanceOwnable {
         return (nonceId, createdAt);
     }
 
-    function tokenLiquidityFlow(address tokenAddress, uint256 nonceNumber, uint256 fromDate) external view returns (uint256) {
-        uint liquidityIn;
-        uint nonceFromDate = IRedeemableBondCalculator.getNonceFromDate(fromDate);
-        for (uint i = nonceFromDate; i >= nonceFromDate - nonceNumber; i-- ) {
-            for (uint j = 0; j < classIdsPerTokenAddress.length; j++ ) {
-                Nonce storage nonce = classes[classIdsPerTokenAddress[j]].nonces[i];
-                liquidityIn += (nonce._activeSupply + nonce._redeemedSupply);
+    function supplyIssuedOnPeriod(address tokenAddress, uint256 fromNonceId, uint256 toNonceId) external view returns (uint256 supply) {
+        require(fromNonceId <= toNonceId, "DebondBond Error: Invalid Input");
+        // we loop on every nonces required of every token's classes
+        for (uint i = fromNonceId; i <= toNonceId; i++ ) {
+            for (uint j = 0; j < classIdsPerTokenAddress[tokenAddress].length; j++ ) {
+                Nonce storage nonce = classes[classIdsPerTokenAddress[tokenAddress][j]].nonces[i];
+                supply += (nonce._activeSupply + nonce._redeemedSupply);
             }
         }
-        return liquidityIn;
     }
 
+    /**
+    * @notice the nonceId in the input must has been used for issuing bonds of one of the token's class, otherwise it will return the default token supply value: 0
+    */
     function tokenSupplyAtNonce(address tokenAddress, uint256 nonceId) external view returns (uint256) {
-        uint supply;
-        for (uint i = 0; i < classIdsPerTokenAddress.length; i++ ) {
-            Class storage class = classes[classIdsPerTokenAddress[i]];
-            Nonce storage nonce = class.nonces[nonceId];
-            supply += !nonce.exists ? class.nonces[class.lastNonceIdCreated].classLiquidity : nonce.classLiquidity;
-        }
-        return supply;
+        return tokenTotalSupplyAtNonce[tokenAddress][nonceId];
     }
-
 
 
     function getNoncesPerAddress(address addr, uint256 classId) public view returns (uint256[] memory) {
