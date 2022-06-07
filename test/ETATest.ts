@@ -46,7 +46,8 @@ contract('Bond', async (accounts: string[]) => {
         {nonceId: 45, issue: "fix"},
         {nonceId: 46, issue: "fix"},
         {nonceId: 47, issue: "fix"},
-        {nonceId: 51, issue: "fix"}
+        {nonceId: 48, issue: "float"},
+        {nonceId: 51, issue: "fix"},
         ]
 
     const [owner, governance, issuerEntity, buyer, falseIssuerEntity, DBITAddress, USDCAddress] = accounts;
@@ -92,22 +93,25 @@ contract('Bond', async (accounts: string[]) => {
 
     it('ETA', async () => {
         const benchmark = 0.05;
-        const umonth = (await bondContract.supplyIssuedOnPeriod(USDCAddress,21, 51)).div(web3.utils.toBN(51 - 21));
-        const BsumN = await bondContract.tokenSupplyAtNonce(USDCAddress, 10);
-        const BsumNl = await bondContract.tokenTotalSupply(USDCAddress);
+        const supplyOnMonth = +web3.utils.fromWei(await bondContract.supplyIssuedOnPeriod(USDCAddress,21, 51));
+        const umonth = supplyOnMonth / 30;
+        const BsumN = +web3.utils.fromWei(await bondContract.tokenSupplyAtNonce(USDCAddress, 10));
+        const BsumNl = +web3.utils.fromWei(await bondContract.tokenTotalSupply(USDCAddress));
 
-        const BsumNInterest = BsumN.add(BsumN.div(web3.utils.toBN(20)))
-        const BsumInterestMinusBsumnL = BsumNInterest.sub(BsumNl);
-        const DonuMonth = BsumInterestMinusBsumnL.div(umonth)
-        const eta = DonuMonth.mul(web3.utils.toBN(24*3600));
+        const BsumNInterest = BsumN * (1 + benchmark);
+        const BsumInterestMinusBsumnL = BsumNInterest - BsumNl;
+        const DonuMonth = BsumInterestMinusBsumnL / umonth;
+        const eta = DonuMonth * 86400;
         console.log(
-            BsumN.toString(),
-            BsumNl.toString(),
-            umonth.toString(),
-            BsumNInterest.toString(),
-            BsumInterestMinusBsumnL.toString(),
-            DonuMonth.toNumber(),
-            eta.toNumber())
+            BsumN,
+            BsumNl,
+            supplyOnMonth,
+            umonth,
+            BsumNInterest,
+            BsumInterestMinusBsumnL,
+            DonuMonth,
+            eta
+        )
         ;
     })
 });
