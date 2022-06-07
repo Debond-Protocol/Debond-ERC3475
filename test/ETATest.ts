@@ -39,6 +39,13 @@ contract('Bond', async (accounts: string[]) => {
         {nonceId: 35, issue: "fix"},
         {nonceId: 38, issue: "float"},
         {nonceId: 40, issue: "fix"},
+        {nonceId: 41, issue: "fix"},
+        {nonceId: 42, issue: "fix"},
+        {nonceId: 43, issue: "fix"},
+        {nonceId: 44, issue: "fix"},
+        {nonceId: 45, issue: "fix"},
+        {nonceId: 46, issue: "fix"},
+        {nonceId: 47, issue: "fix"},
         {nonceId: 51, issue: "fix"}
         ]
 
@@ -78,13 +85,29 @@ contract('Bond', async (accounts: string[]) => {
 
     })
 
-    it('USDC Bonds Total Supply', async () => {
-        console.log(USDCNonces.length, (await bondContract.tokenTotalSupply(USDCAddress)).toString())
-        assert.equal((await bondContract.tokenTotalSupply(USDCAddress)).toString(), (web3.utils.toWei((10000 * 30).toString())))
-    })
+    // it('USDC Bonds Total Supply', async () => {
+    //     console.log(USDCNonces.length, (await bondContract.tokenTotalSupply(USDCAddress)).toString())
+    //     assert.equal((await bondContract.tokenTotalSupply(USDCAddress)).toString(), (web3.utils.toWei((10000 * 30).toString())))
+    // })
 
-    it('USDC Bsum(n)', async () => {
-        console.log((await bondContract.tokenSupplyAtNonce(USDCAddress,1)).toString())
-        console.log((await bondContract.supplyIssuedOnPeriod(USDCAddress,25, 51)).div(web3.utils.toBN(51 - 25)).toString())
+    it('ETA', async () => {
+        const benchmark = 0.05;
+        const umonth = (await bondContract.supplyIssuedOnPeriod(USDCAddress,21, 51)).div(web3.utils.toBN(51 - 21));
+        const BsumN = await bondContract.tokenSupplyAtNonce(USDCAddress, 10);
+        const BsumNl = await bondContract.tokenTotalSupply(USDCAddress);
+
+        const BsumNInterest = BsumN.add(BsumN.div(web3.utils.toBN(20)))
+        const BsumInterestMinusBsumnL = BsumNInterest.sub(BsumNl);
+        const DonuMonth = BsumInterestMinusBsumnL.div(umonth)
+        const eta = DonuMonth.mul(web3.utils.toBN(24*3600));
+        console.log(
+            BsumN.toString(),
+            BsumNl.toString(),
+            umonth.toString(),
+            BsumNInterest.toString(),
+            BsumInterestMinusBsumnL.toString(),
+            DonuMonth.toNumber(),
+            eta.toNumber())
+        ;
     })
 });
