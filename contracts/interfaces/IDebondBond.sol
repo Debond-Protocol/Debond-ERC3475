@@ -15,30 +15,21 @@ pragma solidity ^0.8.0;
     limitations under the License.
 */
 
+import "erc3475/contracts/IERC3475.sol";
 
-interface IDebondBond {
+
+
+interface IDebondBond is IERC3475{
 
     enum InterestRateType {FixedRate, FloatingRate}
 
-    function bondAmountDue(address tokenAddress, InterestRateType interestRateType) external view returns (uint);
+    function createNonce(uint256 classId, uint256 nonceId, uint256[] calldata values) external;
 
-    function createNonce(uint256 classId, uint256 nonceId, uint256 maturityTime) external;
-
-    function createClass(uint256 classId, string memory symbol, InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) external;
+    function createClass(uint256 classId, string symbol, uint256[] calldata values) external;
 
     function setRedeemableBondCalculatorAddress(address _redeemableBondCalculatorAddress) external;
 
     function updateLastNonce(uint classId, uint nonceId, uint createdAt) external;
-
-
-
-    function classExists(uint256 classId) external view returns (bool);
-
-    function nonceExists(uint256 classId, uint256 nonceId) external view returns (bool);
-
-    function bondDetails(uint256 classId, uint256 nonceId) external view returns (string memory _symbol, InterestRateType _interestRateType, address _tokenAddress, uint256 _periodTimestamp, uint256 _maturityDate, uint256 _issuanceDate, uint256 _tokenLiquidity);
-
-    function tokenTotalSupply(address tokenAddress) external view returns (uint256);
 
     function tokenLiquidityFlow(address tokenAddress, uint256 nonceNumber, uint256 fromDate) external view returns (uint256);
 

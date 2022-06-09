@@ -4,13 +4,12 @@
 pragma solidity ^0.8.0;
 
 
-import "erc3475/contracts/IERC3475.sol";
 import "./interfaces/IDebondBond.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 
 
-abstract contract DebondERC3475 is IERC3475, AccessControl {
+contract DebondERC3475 is IDebondBond, AccessControl {
 
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
 
@@ -24,10 +23,8 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
         uint256 _activeSupply;
         uint256 _burnedSupply;
         uint256 _redeemedSupply;
-        uint256 maturityDate;
-        uint256 issuanceDate;
         uint256 classLiquidity;
-        uint256[] infos;
+        uint256[] values;
         mapping(address => uint256) balances;
         mapping(address => mapping(address => uint256)) allowances;
     }
@@ -40,10 +37,7 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
         uint256 id;
         bool exists;
         string symbol;
-        uint256[] infos;
-        IDebondBond.InterestRateType interestRateType;
-        address tokenAddress;
-        uint256 periodTimestamp;
+        uint256[] values;
         uint256 liquidity;
         mapping(address => mapping(uint256 => bool)) noncesPerAddress;
         mapping(address => uint256[]) noncesPerAddressArray;
@@ -66,6 +60,126 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
 
 
     // WRITE
+
+    function issue(address to, uint256 classId, uint256 nonceId, uint256 amount) external override onlyRole(ISSUER_ROLE) {
+        require(classes[classId].exists, "ERC3475: only issue bond that has been created");
+        require(classes[classId].nonces[nonceId].exists, "ERC-3475: nonceId given not found!");
+        require(to != address(0), "ERC3475: can't transfer to the zero address");
+        _issue(to, classId, nonceId, amount);
+
+        if (!classesPerHolder[to][classId]) {
+            classesPerHolderArray[to].push(classId);
+            classesPerHolder[to][classId] = true;
+        }
+
+        Class storage class = classes[classId];
+        class.liquidity += amount;
+
+        if (!class.noncesPerAddress[to][nonceId]) {
+            class.noncesPerAddressArray[to].push(nonceId);
+            class.noncesPerAddress[to][nonceId] = true;
+        }
+
+        Nonce storage nonce = class.nonces[nonceId];
+        nonce.classLiquidity = class.liquidity + amount;
+        emit Issue(msg.sender, to, classId, nonceId, amount);
+    }
+
+    function createClass(uint256 classId, string symbol, uint256[] calldata values) external {
+        require(!classExists(classId), "ERC3475: cannot create a class that already exists");
+        Class storage class = classes[classId];
+        class.id = classId;
+        class.exists = true;
+        class.symbol = symbol;
+        class.values = values;
+    }
+
+    function updateLastNonce(uint classId, uint nonceId, uint createdAt) external onlyRole(ISSUER_ROLE) {
+        Class storage class = classes[classId];
+        require(class.exists, "Debond Data: class id given not found");
+        class.lastNonceIdCreated = nonceId;
+        class.lastNonceIdCreatedTimestamp = createdAt;
+    }
+
+    function createNonce(uint256 classId, uint256 nonceId, uint256[] calldata values) external onlyRole(ISSUER_ROLE) {
+        require(classExists(classId), "ERC3475: only issue bond that has been created");
+        Class storage class = classes[classId];
+
+        Nonce storage nonce = class.nonces[nonceId];
+        require(!nonce.exists, "Error ERC-3475: nonceId exists!");
+
+        nonce.id = nonceId;
+        nonce.exists = true;
+        nonce.values = values;
+    }
+
+    function setRedeemableBondCalculatorAddress(address _redeemableBondCalculatorAddress) external onlyGovernance {
+        require(_redeemableBondCalculatorAddress != address(0), "null Address given");
+        redeemableBondCalculatorAddress = _redeemableBondCalculatorAddress;
+    }
+
+    function tokenSupplyAtNonce(address tokenAddress, uint256 nonceId) external view returns (uint256) {
+        uint supply;
+        for (uint i = 0; i < classIdsPerTokenAddress.length; i++ ) {
+            Class storage class = classes[classIdsPerTokenAddress[i]];
+            Nonce storage nonce = class.nonces[nonceId];
+            supply += !nonce.exists ? class.nonces[class.lastNonceIdCreated].classLiquidity : nonce.classLiquidity;
+        }
+        return supply;
+    }
+
+    function getLastNonceCreated(uint classId) external view returns (uint nonceId, uint createdAt) {
+        Class storage class = classes[classId];
+        require(class.exists, "Debond Data: class id given not found");
+        nonceId = class.lastNonceIdCreated;
+        createdAt = class.lastNonceIdCreatedTimestamp;
+        return (nonceId, createdAt);
+    }
+
+    function getNoncesPerAddress(address addr, uint256 classId) public view returns (uint256[] memory) {
+        return classes[classId].noncesPerAddressArray[addr];
+    }
+
+    function batchActiveSupply(uint256 classId) public view returns (uint256) {
+        uint256 _batchActiveSupply;
+        uint256[] memory nonces = classes[classId].nonceIds;
+        // _lastBondNonces can be recovered from the last message of the nonceId
+        // @drisky we can indeed
+        for (uint256 i = 0; i <= nonces.length; i++) {
+            _batchActiveSupply += activeSupply(classId, nonces[i]);
+        }
+        return _batchActiveSupply;
+    }
+
+    function batchBurnedSupply(uint256 classId) public view returns (uint256) {
+        uint256 _batchBurnedSupply;
+        uint256[] memory nonces = classes[classId].nonceIds;
+
+        for (uint256 i = 0; i <= nonces.length; i++) {
+            _batchBurnedSupply += burnedSupply(classId, nonces[i]);
+        }
+        return _batchBurnedSupply;
+    }
+
+    function batchRedeemedSupply(uint256 classId) public view returns (uint256) {
+        uint256 _batchRedeemedSupply;
+        uint256[] memory nonces = classes[classId].nonceIds;
+
+        for (uint256 i = 0; i <= nonces.length; i++) {
+            _batchRedeemedSupply += redeemedSupply(classId, nonces[i]);
+        }
+        return _batchRedeemedSupply;
+    }
+
+    function batchTotalSupply(uint256 classId) public view returns (uint256) {
+        uint256 _batchTotalSupply;
+        uint256[] memory nonces = classes[classId].nonceIds;
+
+        for (uint256 i = 0; i <= nonces.length; i++) {
+            _batchTotalSupply += totalSupply(classId, nonces[i]);
+        }
+        return _batchTotalSupply;
+    }
 
     function transferFrom(address from, address to, uint256 classId, uint256 nonceId, uint256 amount) public virtual override {
         require(msg.sender == from || isApprovedFor(from, msg.sender, classId), "ERC3475: caller is not owner nor approved");
@@ -146,12 +260,12 @@ abstract contract DebondERC3475 is IERC3475, AccessControl {
 
 
     function classInfos(uint256 classId) public view override returns (uint256[] memory) {
-        return classes[classId].infos;
+        return classes[classId].values;
     }
 
 
     function nonceInfos(uint256 classId, uint256 nonceId) public view override returns (uint256[] memory) {
-        return classes[classId].nonces[nonceId].infos;
+        return classes[classId].nonces[nonceId].values;
     }
 
     function classInfoDescription(uint256 classInfo) external view returns (string memory) {
