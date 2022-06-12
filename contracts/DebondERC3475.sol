@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract DebondERC3475 is IDebondBond, AccessControl {
 
-    bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
+    address bankAddress;
 
     /**
     * @notice this Struct is representing the Nonce properties as an object
@@ -54,14 +54,26 @@ contract DebondERC3475 is IDebondBond, AccessControl {
     mapping(address => mapping(uint256 => bool)) classesPerHolder;
     mapping(address => uint256[]) public classesPerHolderArray;
 
-    constructor() {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    constructor(address _bankAddress) {
+        require(_bankAddress != address(0), "DebondERC3475 Error: Address given is address(0)");
+        bankAddress = _bankAddress;
+    }
+
+    modifier onlyBank() {
+        require(msg.sender == bankAddress, "DebondERC3475 Error: Not authorized");
+        _;
+    }
+
+    //TODO onlyGovernance
+    function setBankAddress(address _bankAddress) external {
+        require(_bankAddress != address(0), "DebondERC3475 Error: Address given is address(0)");
+        bankAddress = _bankAddress;
     }
 
 
     // WRITE
 
-    function issue(address to, uint256 classId, uint256 nonceId, uint256 amount) external override onlyRole(ISSUER_ROLE) {
+    function issue(address to, uint256 classId, uint256 nonceId, uint256 amount) external override onlyBank {
         require(classes[classId].exists, "ERC3475: only issue bond that has been created");
         require(classes[classId].nonces[nonceId].exists, "ERC-3475: nonceId given not found!");
         require(to != address(0), "ERC3475: can't transfer to the zero address");
@@ -85,7 +97,7 @@ contract DebondERC3475 is IDebondBond, AccessControl {
         emit Issue(msg.sender, to, classId, nonceId, amount);
     }
 
-    function createClass(uint256 classId, string symbol, uint256[] calldata values) external {
+    function createClass(uint256 classId, string symbol, uint256[] calldata values) external onlyBank {
         require(!classExists(classId), "ERC3475: cannot create a class that already exists");
         Class storage class = classes[classId];
         class.id = classId;
@@ -94,14 +106,14 @@ contract DebondERC3475 is IDebondBond, AccessControl {
         class.values = values;
     }
 
-    function updateLastNonce(uint classId, uint nonceId, uint createdAt) external onlyRole(ISSUER_ROLE) {
+    function updateLastNonce(uint classId, uint nonceId, uint createdAt) external onlyBank {
         Class storage class = classes[classId];
         require(class.exists, "Debond Data: class id given not found");
         class.lastNonceIdCreated = nonceId;
         class.lastNonceIdCreatedTimestamp = createdAt;
     }
 
-    function createNonce(uint256 classId, uint256 nonceId, uint256[] calldata values) external onlyRole(ISSUER_ROLE) {
+    function createNonce(uint256 classId, uint256 nonceId, uint256[] calldata values) external onlyBank {
         require(classExists(classId), "ERC3475: only issue bond that has been created");
         Class storage class = classes[classId];
 
@@ -111,21 +123,6 @@ contract DebondERC3475 is IDebondBond, AccessControl {
         nonce.id = nonceId;
         nonce.exists = true;
         nonce.values = values;
-    }
-
-    function setRedeemableBondCalculatorAddress(address _redeemableBondCalculatorAddress) external onlyGovernance {
-        require(_redeemableBondCalculatorAddress != address(0), "null Address given");
-        redeemableBondCalculatorAddress = _redeemableBondCalculatorAddress;
-    }
-
-    function tokenSupplyAtNonce(address tokenAddress, uint256 nonceId) external view returns (uint256) {
-        uint supply;
-        for (uint i = 0; i < classIdsPerTokenAddress.length; i++ ) {
-            Class storage class = classes[classIdsPerTokenAddress[i]];
-            Nonce storage nonce = class.nonces[nonceId];
-            supply += !nonce.exists ? class.nonces[class.lastNonceIdCreated].classLiquidity : nonce.classLiquidity;
-        }
-        return supply;
     }
 
     function getLastNonceCreated(uint classId) external view returns (uint nonceId, uint createdAt) {
@@ -224,6 +221,14 @@ contract DebondERC3475 is IDebondBond, AccessControl {
     }
 
     // READS
+
+    function classExists(uint256 classId) public view returns (bool) {
+        return classes[classId].exists;
+    }
+
+    function nonceExists(uint256 classId, uint256 nonceId) public view returns (bool) {
+        return classes[classId].nonces[nonceId].exists;
+    }
 
 
     function totalSupply(uint256 classId, uint256 nonceId) public override view returns (uint256) {

@@ -21,22 +21,16 @@ import "erc3475/contracts/IERC3475.sol";
 
 interface IDebondBond is IERC3475{
 
-    enum InterestRateType {FixedRate, FloatingRate}
-
     function createNonce(uint256 classId, uint256 nonceId, uint256[] calldata values) external;
 
     function createClass(uint256 classId, string symbol, uint256[] calldata values) external;
 
-    function setRedeemableBondCalculatorAddress(address _redeemableBondCalculatorAddress) external;
-
     function updateLastNonce(uint classId, uint nonceId, uint createdAt) external;
-
-    function tokenLiquidityFlow(address tokenAddress, uint256 nonceNumber, uint256 fromDate) external view returns (uint256);
-
-    function tokenSupplyAtNonce(address tokenAddress, uint256 nonceId) external view returns (uint256);
 
     function getLastNonceCreated(uint classId) external view returns(uint nonceId, uint createdAt);
 
-    function getClassesPerTokenAddress(address tokenAddress) external view returns (uint256[] memory);
+    function classExists(uint256 classId) public view returns (bool);
+
+    function nonceExists(uint256 classId, uint256 nonceId) public view returns (bool);
 }
 

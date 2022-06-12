@@ -31,17 +31,6 @@ contract BankBondManager is GovernanceOwnable {
         debondBondAddress = _debondBondAddress;
     }
 
-
-    // WRITE
-
-    function classExists(uint256 classId) public view returns (bool) {
-        return classes[classId].exists;
-    }
-
-    function nonceExists(uint256 classId, uint256 nonceId) public view returns (bool) {
-        return classes[classId].nonces[nonceId].exists;
-    }
-
     function issue(address to, uint256 classId, uint256 nonceId, uint256 amount) external override onlyRole(ISSUER_ROLE) {
 
         tokenRateTypeTotalSupply[class.tokenAddress][class.interestRateType] += amount;
@@ -49,6 +38,7 @@ contract BankBondManager is GovernanceOwnable {
     }
 
     function createClass(uint256 classId, string memory _symbol, InterestRateType interestRateType, address tokenAddress, uint256 periodTimestamp) public override onlyGovernance {
+        require(!DebondERC3475(debondBondAddress).classExists(classId), "ERC3475: cannot create a class that already exists");
         uint tokenInterestValue = uint256(interestRateType);
         if (!tokenAddressExist[tokenAddress]) {
             ++tokenAddressCount;
@@ -57,16 +47,11 @@ contract BankBondManager is GovernanceOwnable {
         uint tokenAddressValue = tokenAddressValueMapping[tokenAddress];
 
         uint[] values = [tokenAddressValue, tokenInterestValue, periodTimestamp];
-        _createClass(classId, values);
+        DebondERC3475(debondBondAddress).createClass(classId, symbol, values);
         classIdsPerTokenAddress[tokenAddress].push(classId);
     }
 
-    function _createClass(uint256 classId, string symbol, uint256[] calldata values) internal {
-        require(!classExists(classId), "ERC3475: cannot create a class that already exists");
-        DebondERC3475(debondBondAddress).createClass(classId, symbol, values);
-    }
-
-    function createNonce(uint256 classId, uint256 nonceId, uint256 _maturityDate) external override onlyRole(ISSUER_ROLE) {
+    function createNonce(uint256 classId, uint256 nonceId, uint256 _maturityDate) internal {
         uint[] values = [block.timestamp, _maturityDate];
         DebondERC3475(debondBondAddress).createNonce(classId, nonceId, values);
     }
@@ -102,6 +87,16 @@ contract BankBondManager is GovernanceOwnable {
             }
         }
         return liquidityIn;
+    }
+
+    function tokenSupplyAtNonce(address tokenAddress, uint256 nonceId) external view returns (uint256) {
+        uint supply;
+        for (uint i = 0; i < classIdsPerTokenAddress.length; i++ ) {
+            Class storage class = classes[classIdsPerTokenAddress[i]];
+            Nonce storage nonce = class.nonces[nonceId];
+            supply += !nonce.exists ? class.nonces[class.lastNonceIdCreated].classLiquidity : nonce.classLiquidity;
+        }
+        return supply;
     }
 
     function bondAmountDue(address tokenAddress, InterestRateType interestRateType) external view returns (uint256) {
