@@ -6,6 +6,6 @@ interface IRedeemableBondCalculator {
 
     function isRedeemable(uint256 classId, uint256 nonceId) external view returns (bool);
 
-    function getNonceFromDate(uint256 timestampDate) public view returns (uint256);
+    function getNonceFromDate(uint256 timestampDate) external view returns (uint256);
 
 }
