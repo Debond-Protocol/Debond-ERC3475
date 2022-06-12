@@ -23,14 +23,14 @@ interface IDebondBond is IERC3475{
 
     function createNonce(uint256 classId, uint256 nonceId, uint256[] calldata values) external;
 
-    function createClass(uint256 classId, string symbol, uint256[] calldata values) external;
+    function createClass(uint256 classId, string calldata symbol, uint256[] calldata values) external;
 
     function updateLastNonce(uint classId, uint nonceId, uint createdAt) external;
 
     function getLastNonceCreated(uint classId) external view returns(uint nonceId, uint createdAt);
 
-    function classExists(uint256 classId) public view returns (bool);
+    function classExists(uint256 classId) external view returns (bool);
 
-    function nonceExists(uint256 classId, uint256 nonceId) public view returns (bool);
+    function nonceExists(uint256 classId, uint256 nonceId) external view returns (bool);
 }
 

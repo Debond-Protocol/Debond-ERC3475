@@ -5,11 +5,11 @@ pragma solidity ^0.8.0;
 
 
 import "./interfaces/IDebondBond.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "./interfaces/IRedeemableBondCalculator.sol";
 
 
 
-contract DebondERC3475 is IDebondBond, AccessControl {
+contract DebondERC3475 is IDebondBond {
 
     address bankAddress;
 
@@ -97,12 +97,12 @@ contract DebondERC3475 is IDebondBond, AccessControl {
         emit Issue(msg.sender, to, classId, nonceId, amount);
     }
 
-    function createClass(uint256 classId, string symbol, uint256[] calldata values) external onlyBank {
+    function createClass(uint256 classId, string calldata _symbol, uint256[] calldata values) external onlyBank {
         require(!classExists(classId), "ERC3475: cannot create a class that already exists");
         Class storage class = classes[classId];
         class.id = classId;
         class.exists = true;
-        class.symbol = symbol;
+        class.symbol = _symbol;
         class.values = values;
     }
 
@@ -184,9 +184,12 @@ contract DebondERC3475 is IDebondBond, AccessControl {
         emit Transfer(msg.sender, from, to, classId, nonceId, amount);
     }
 
+    function isRedeemable(uint256 classId, uint256 nonceId) public view returns (bool) {
+        return IRedeemableBondCalculator(bankAddress).isRedeemable(classId, nonceId);
+    }
 
 
-    function redeem(address from, uint256 classId, uint256 nonceId, uint256 amount) external override onlyRole(ISSUER_ROLE) {
+    function redeem(address from, uint256 classId, uint256 nonceId, uint256 amount) external override onlyBank {
         require(classes[classId].nonces[nonceId].exists, "ERC3475: given Nonce doesn't exist");
         require(from != address(0), "ERC3475: can't transfer to the zero address");
         require(isRedeemable(classId, nonceId), "Bond is not redeemable");
@@ -195,7 +198,7 @@ contract DebondERC3475 is IDebondBond, AccessControl {
     }
 
 
-    function burn(address from, uint256 classId, uint256 nonceId, uint256 amount) external override onlyRole(ISSUER_ROLE) {
+    function burn(address from, uint256 classId, uint256 nonceId, uint256 amount) external override onlyBank {
         require(from != address(0), "ERC3475: can't transfer to the zero address");
         _burn(from, classId, nonceId, amount);
         emit Burn(msg.sender, from, classId, nonceId, amount);
@@ -280,9 +283,6 @@ contract DebondERC3475 is IDebondBond, AccessControl {
     function nonceInfoDescription(uint256 nonceInfo) external view returns (string memory) {
         return nonceInfoDescriptions[nonceInfo];
     }
-
-
-    function isRedeemable(uint256 classId, uint256 nonceId) public virtual override view returns (bool);
 
     function allowance(address owner, address spender, uint256 classId, uint256 nonceId) external view returns (uint256) {
         return classes[classId].nonces[nonceId].allowances[owner][spender];
