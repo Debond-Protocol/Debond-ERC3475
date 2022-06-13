@@ -1,12 +1,12 @@
 import {
-    DebondBondInstance
+     DebondERC3475Instance
 } from "../types/truffle-contracts";
 
-const DebondBond = artifacts.require("DebondBond");
+const DebondBond = artifacts.require("DebondERC3475");
 
 contract('Bond', async (accounts: string[]) => {
 
-    let bondContract: DebondBondInstance
+    let bondContract: DebondERC3475Instance
 
     let DBIT_FIX_6MTH_CLASS_ID: number;
     let USDC_FIX_6MTH_CLASS_ID: number;
@@ -18,20 +18,16 @@ contract('Bond', async (accounts: string[]) => {
         DBIT_FIX_6MTH_CLASS_ID = 0;
         USDC_FIX_6MTH_CLASS_ID = 1;
 
-
-        const ISSUER_ROLE = await bondContract.ISSUER_ROLE();
-        await bondContract.grantRole(ISSUER_ROLE, issuerEntity, {from: owner})
-
     })
 
     it('Only Governance can create new classes', async () => {
-        await bondContract.createClass(DBIT_FIX_6MTH_CLASS_ID, "DBIT", 0, DBITAddress, 3600 * 24 * 30, {from: governance});
+        await bondContract.createClass(DBIT_FIX_6MTH_CLASS_ID, "DBIT", [DBITAddress, 0, 3600 * 24 * 30]);
 
     })
 
     it('Only Address with Issuer Role can create new nonces', async () => {
         try {
-            await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 0, Date.now() + 10000, {from: falseIssuerEntity});
+            await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 0, [Date.now(), Date.now() + 10000], {from: falseIssuerEntity});
         } catch (e: any) {
             assert(typeof e.reason === 'string')
         }

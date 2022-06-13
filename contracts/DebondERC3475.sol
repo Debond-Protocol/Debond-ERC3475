@@ -6,10 +6,11 @@ pragma solidity ^0.8.0;
 
 import "./interfaces/IDebondBond.sol";
 import "./interfaces/IRedeemableBondCalculator.sol";
+import "debond-governance/contracts/utils/GovernanceOwnable.sol";
 
 
 
-contract DebondERC3475 is IDebondBond {
+contract DebondERC3475 is IDebondBond, GovernanceOwnable {
 
     address bankAddress;
 
@@ -54,10 +55,7 @@ contract DebondERC3475 is IDebondBond {
     mapping(address => mapping(uint256 => bool)) classesPerHolder;
     mapping(address => uint256[]) public classesPerHolderArray;
 
-    constructor(address _bankAddress) {
-        require(_bankAddress != address(0), "DebondERC3475 Error: Address given is address(0)");
-        bankAddress = _bankAddress;
-    }
+    constructor(address _governanceAddress) GovernanceOwnable(_governanceAddress) {}
 
     modifier onlyBank() {
         require(msg.sender == bankAddress, "DebondERC3475 Error: Not authorized");
@@ -65,7 +63,7 @@ contract DebondERC3475 is IDebondBond {
     }
 
     //TODO onlyGovernance
-    function setBankAddress(address _bankAddress) external {
+    function setBankAddress(address _bankAddress) onlyGovernance external {
         require(_bankAddress != address(0), "DebondERC3475 Error: Address given is address(0)");
         bankAddress = _bankAddress;
     }
