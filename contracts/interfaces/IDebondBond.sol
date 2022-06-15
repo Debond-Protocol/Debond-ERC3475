@@ -32,5 +32,9 @@ interface IDebondBond is IERC3475{
     function classExists(uint256 classId) external view returns (bool);
 
     function nonceExists(uint256 classId, uint256 nonceId) external view returns (bool);
+
+    function classLiquidity(uint256 classId) external view returns (uint256);
+
+    function classLiquidityAtNonce(uint256 classId, uint256 nonceId) external view returns (uint256);
 }
 
