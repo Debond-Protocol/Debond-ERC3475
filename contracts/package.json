@@ -1,0 +1,11 @@
+{
+  "name": "debond-erc3475-contracts",
+  "version": "0.0.1",
+  "description": "Debond Protocol implementation of IERC3475",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "info@debond.org",
+  "license": "ISC"
+}
