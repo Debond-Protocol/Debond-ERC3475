@@ -21,9 +21,13 @@ import "erc3475/IERC3475.sol";
 
 interface IDebondBond is IERC3475{
 
-    function createNonce(uint256 classId, uint256 nonceId, uint256[] calldata values) external;
+    function createClassMetadata(uint metadataId, IERC3475.Metadata memory metadata) external;
 
-    function createClass(uint256 classId, string calldata symbol, uint256[] calldata values) external;
+    function createNonceMetadata(uint classId, uint metadataId, IERC3475.Metadata memory metadata) external;
+
+    function createNonce(uint256 classId, uint256 nonceId, uint256[] calldata metadataIds, IERC3475.Values[] calldata values) external;
+
+    function createClass(uint256 classId, uint256[] calldata metadataIds, IERC3475.Values[] calldata values) external;
 
     function updateLastNonce(uint classId, uint nonceId, uint createdAt) external;
 

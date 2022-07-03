@@ -1,5 +1,8 @@
 pragma solidity ^0.8.0;
 
+// SPDX-License-Identifier: MIT
+
+
 import "../interfaces/IProgressCalculator.sol";
 import "erc3475/IERC3475.sol";
 import "../DebondERC3475.sol";

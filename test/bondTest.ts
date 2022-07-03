@@ -9,8 +9,27 @@ const ProgressCalculator = artifacts.require("ProgressCalculator");
 interface Transaction {
     classId: number | BN | string;
     nonceId: number | BN | string;
-    _amount: number | BN | string;
+    amount: number | BN | string;
+}
 
+interface Metadata {
+    title: string;
+    types: string;
+    description: string;
+}
+
+interface Value {
+    stringValue: string;
+    uintValue: number | BN | string;
+    addressValue: string;
+    boolValue: boolean;
+}
+
+const defaultValue: Value = {
+    stringValue: "",
+    uintValue: 0,
+    addressValue: "0x0000000000000000000000000000000000000000",
+    boolValue: false
 }
 
 contract('Bond', async (accounts: string[]) => {
@@ -23,6 +42,17 @@ contract('Bond', async (accounts: string[]) => {
     const [governance, bank, user1, user2, operator, DBITAddress, USDCAddress] = accounts;
 
     const now = parseInt(Date.now().toString().substring(-3));
+    const classMetadatas: Metadata[] = [
+        {title: "symbol", types: "string", description: "the collateral token's symbol"},
+        {title: "token address", types: "address", description: "the collateral token's address"},
+        {title: "interest rate type", types: "int", description: "the interest rate type"},
+        {title: "period", types: "int", description: "the base period for the class"},
+    ]
+
+    const nonceMetadatas: Metadata[] = [
+        {title: "issuance Date", types: "int", description: "the issuance date"},
+        {title: "maturity Date", types: "int", description: "the maturity date"}
+    ]
 
     it('Initialisation', async () => {
         bondContract = await DebondBond.deployed();
@@ -30,16 +60,47 @@ contract('Bond', async (accounts: string[]) => {
 
     })
 
-    it('Should create a new class, only the Bank can do that action', async () => {
-        await bondContract.createClass(DBIT_FIX_6MTH_CLASS_ID, "DBIT", [0, 0, 3600 * 24 * 30], {from: bank});
-        const classExists = await bondContract.classExists(DBIT_FIX_6MTH_CLASS_ID)
-        assert.isTrue(classExists);
-
+    it('Should create set of metadatas for classes, only the Bank can do that action', async () => {
+        for (const metadata of classMetadatas) {
+            const index = classMetadatas.indexOf(metadata);
+            await bondContract.createClassMetadata(index, metadata, {from: bank})
+        }
+        const metadata = await bondContract.classMetadata(0);
+        assert.isTrue(metadata.title == classMetadatas[0].title);
+        assert.isTrue(metadata.types == classMetadatas[0].types);
+        assert.isTrue(metadata.description == classMetadatas[0].description);
     })
 
-    it('Should create a new Nonce, only the Bank can do that action', async () => {
-        await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 0, [now, now], {from: bank});
-        const nonceExists = await bondContract.nonceExists(DBIT_FIX_6MTH_CLASS_ID, 0);
+    it('Should create a new class, only the Bank can do that action', async () => {
+        const values: Value[] = [
+            {...defaultValue, stringValue: "DBIT"},
+            {...defaultValue, addressValue: DBITAddress},
+            {...defaultValue, uintValue: 0},
+            {...defaultValue, uintValue: 3600 * 24 * 180 }, // 6 months
+        ]
+        await bondContract.createClass(DBIT_FIX_6MTH_CLASS_ID, classMetadatas.map(metadata => classMetadatas.indexOf(metadata)), values, {from: bank});
+        const classExists = await bondContract.classExists(DBIT_FIX_6MTH_CLASS_ID)
+        assert.isTrue(classExists);
+    })
+
+    it('Should create set of metadatas for a class nonces, only the Bank can do that action', async () => {
+        for (const metadata of nonceMetadatas) {
+            const index = nonceMetadatas.indexOf(metadata);
+            await bondContract.createNonceMetadata(DBIT_FIX_6MTH_CLASS_ID, index, metadata, {from: bank})
+        }
+        const metadata = await bondContract.nonceMetadata(DBIT_FIX_6MTH_CLASS_ID, 0);
+        assert.isTrue(metadata.title == nonceMetadatas[0].title);
+        assert.isTrue(metadata.types == nonceMetadatas[0].types);
+        assert.isTrue(metadata.description == nonceMetadatas[0].description);
+    })
+
+    it('Should create a new nonce for a given class, only the Bank can do that action', async () => {
+        const values: Value[] = [
+            {...defaultValue, uintValue: now},
+            {...defaultValue, uintValue: now }, // 6 months
+        ]
+        await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 0, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
+        const nonceExists = await bondContract.nonceExists(DBIT_FIX_6MTH_CLASS_ID, 0)
         assert.isTrue(nonceExists);
     })
 
@@ -51,7 +112,7 @@ contract('Bond', async (accounts: string[]) => {
 
     it('Should Issue bonds to an account, only the Bank can do that action', async () => {
         const transactions: Transaction[] = [
-            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, _amount: web3.utils.toWei('3000')}
+            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('3000')}
         ]
         await bondContract.issue(user1, transactions, {from: bank});
         const buyerBalance = await bondContract.balanceOf(user1, DBIT_FIX_6MTH_CLASS_ID, 0);
@@ -61,7 +122,7 @@ contract('Bond', async (accounts: string[]) => {
 
     it('Should transfer bonds', async () => {
         const transactions: Transaction[] = [
-            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, _amount: web3.utils.toWei('1500')}
+            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('1500')}
         ]
         await bondContract.transferFrom(user1, user2, transactions, {from: user1});
         const user1Balance = await bondContract.balanceOf(user1, DBIT_FIX_6MTH_CLASS_ID, 0);
@@ -71,15 +132,15 @@ contract('Bond', async (accounts: string[]) => {
     })
 
     it('Should setApproval for an operator', async () => {
-        await bondContract.setApprovalFor(operator, DBIT_FIX_6MTH_CLASS_ID, true,{from: user1});
-        await bondContract.setApprovalFor(operator, DBIT_FIX_6MTH_CLASS_ID, true,{from: user2});
-        const isApproved = await bondContract.isApprovedFor(user1, operator, 0);
+        await bondContract.setApprovalFor(operator, true,{from: user1});
+        await bondContract.setApprovalFor(operator, true,{from: user2});
+        const isApproved = await bondContract.isApprovedFor(user1, operator);
         assert.isTrue(isApproved)
     })
 
     it('Should be able for operator to transfer bonds from user to an other', async () => {
         const transactions: Transaction[] = [
-            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, _amount: web3.utils.toWei('1500')}
+            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('1500')}
         ]
         await bondContract.transferFrom(user1, user2, transactions, {from: operator});
         const user1Balance = await bondContract.balanceOf(user1, DBIT_FIX_6MTH_CLASS_ID, 0);
@@ -91,10 +152,10 @@ contract('Bond', async (accounts: string[]) => {
     it('Should be able to burn bonds from user, only bank can do this action', async () => {
 
         // we need to set bank as operator for user
-        await bondContract.setApprovalFor(bank, DBIT_FIX_6MTH_CLASS_ID, true,{from: user2});
+        await bondContract.setApprovalFor(bank, true,{from: user2});
 
         const transactions: Transaction[] = [
-            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, _amount: web3.utils.toWei('1000')}
+            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('1000')}
         ]
         await bondContract.burn(user2, transactions, {from: bank});
         const user2Balance = await bondContract.balanceOf(user2, DBIT_FIX_6MTH_CLASS_ID, 0);
@@ -106,7 +167,7 @@ contract('Bond', async (accounts: string[]) => {
     it('Should be able to redeem bonds from user, only bank can do this action', async () => {
 
         const transactions: Transaction[] = [
-            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, _amount: web3.utils.toWei('1000')}
+            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('1000')}
         ]
         // progressCalculator is bank
         await bondContract.setBankAddress(progressCalculatorContract.address);
