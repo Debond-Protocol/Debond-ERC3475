@@ -1,6 +1,6 @@
 {
   "name": "debond-erc3475-contracts",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Debond Protocol implementation of IERC3475",
   "main": "index.js",
   "scripts": {
