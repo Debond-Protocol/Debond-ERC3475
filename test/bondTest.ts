@@ -79,7 +79,9 @@ contract('Bond', async (accounts: string[]) => {
         ]
         await bondContract.createClass(DBIT_FIX_6MTH_CLASS_ID, classMetadatas.map(metadata => classMetadatas.indexOf(metadata)), values, {from: bank});
         const classExists = await bondContract.classExists(DBIT_FIX_6MTH_CLASS_ID)
+        const classTokenAddress = (await bondContract.classValues(DBIT_FIX_6MTH_CLASS_ID, 1)).addressValue
         assert.isTrue(classExists);
+        assert.isTrue(classTokenAddress == DBITAddress);
     })
 
     it('Should create set of metadatas for a class nonces, only the Bank can do that action', async () => {
@@ -100,7 +102,9 @@ contract('Bond', async (accounts: string[]) => {
         ]
         await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 0, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
         const nonceExists = await bondContract.nonceExists(DBIT_FIX_6MTH_CLASS_ID, 0)
+        const nonceIssuanceDate = (await bondContract.nonceValues(DBIT_FIX_6MTH_CLASS_ID, 0, 0)).uintValue
         assert.isTrue(nonceExists);
+        assert.isTrue(nonceIssuanceDate == now);
     })
 
     it('Should update last nonce created, only the Bank can do that action', async () => {
