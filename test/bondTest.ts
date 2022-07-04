@@ -60,10 +60,12 @@ contract('Bond', async (accounts: string[]) => {
     })
 
     it('Should create set of metadatas for classes, only the Bank can do that action', async () => {
+        let metadataIds: number[] = [];
         for (const metadata of classMetadatas) {
             const index = classMetadatas.indexOf(metadata);
-            await bondContract.createClassMetadata(index, metadata, {from: bank})
+            metadataIds.push(index)
         }
+        await bondContract.createClassMetadataBatch(metadataIds, classMetadatas, {from: bank})
         const metadata = await bondContract.classMetadata(0);
         assert.isTrue(metadata.title == classMetadatas[0].title);
         assert.isTrue(metadata.types == classMetadatas[0].types);
@@ -85,10 +87,12 @@ contract('Bond', async (accounts: string[]) => {
     })
 
     it('Should create set of metadatas for a class nonces, only the Bank can do that action', async () => {
+        let metadataIds: number[] = [];
         for (const metadata of nonceMetadatas) {
             const index = nonceMetadatas.indexOf(metadata);
-            await bondContract.createNonceMetadata(DBIT_FIX_6MTH_CLASS_ID, index, metadata, {from: bank})
+            metadataIds.push(index)
         }
+        await bondContract.createNonceMetadataBatch(DBIT_FIX_6MTH_CLASS_ID, metadataIds, nonceMetadatas, {from: bank})
         const metadata = await bondContract.nonceMetadata(DBIT_FIX_6MTH_CLASS_ID, 0);
         assert.isTrue(metadata.title == nonceMetadatas[0].title);
         assert.isTrue(metadata.types == nonceMetadatas[0].types);

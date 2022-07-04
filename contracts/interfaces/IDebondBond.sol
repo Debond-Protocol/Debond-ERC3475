@@ -23,7 +23,11 @@ interface IDebondBond is IERC3475{
 
     function createClassMetadata(uint metadataId, IERC3475.Metadata memory metadata) external;
 
+    function createClassMetadataBatch(uint[] memory metadataIds, IERC3475.Metadata[] memory metadatas) external;
+
     function createNonceMetadata(uint classId, uint metadataId, IERC3475.Metadata memory metadata) external;
+
+    function createNonceMetadataBatch(uint classId, uint[] memory metadataIds, IERC3475.Metadata[] memory metadatas) external;
 
     function createNonce(uint256 classId, uint256 nonceId, uint256[] calldata metadataIds, IERC3475.Values[] calldata values) external;
 

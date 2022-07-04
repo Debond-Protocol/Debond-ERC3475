@@ -80,6 +80,19 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     }
 
     /**
+    * @notice create a new metadata for classes on the actual bond contract
+    * @param metadataIds the identifiers of the metadatas being created
+    * @param metadatas the metadatas to create
+    */
+    function createClassMetadataBatch(uint[] memory metadataIds, IERC3475.Metadata[] memory metadatas) external onlyBank {
+        require(metadataIds.length == metadatas.length, "DebondERC3475: Incorrect inputs");
+        for (uint i; i < metadataIds.length; i++) {
+            classMetadatas[metadataIds[i]] = metadatas[i];
+        }
+    }
+
+
+    /**
     * @notice create a new metadata for nonces for a given class
     * @dev if the classId given doesn't exist, will revert
     * @param classId the classId
@@ -90,6 +103,22 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         require(classExists(classId), "DebondERC3475: class Id not found");
         classes[classId].nonceMetadatas[metadataId] = metadata;
     }
+
+    /**
+    * @notice create metadatas for nonces for a given class
+    * @dev if the classId given doesn't exist, will revert
+    * @param classId the classId
+    * @param metadataIds the identifiers of the metadatas being created
+    * @param metadatas the metadatas to create
+    */
+    function createNonceMetadataBatch(uint classId, uint[] memory metadataIds, IERC3475.Metadata[] memory metadatas) external onlyBank {
+        require(classExists(classId), "DebondERC3475: class Id not found");
+        require(metadataIds.length == metadatas.length, "DebondERC3475: Incorrect inputs");
+        for (uint i; i < metadataIds.length; i++) {
+            classes[classId].nonceMetadatas[metadataIds[i]] = metadatas[i];
+        }
+    }
+
 
     /**
     * @notice issuance of bonds
