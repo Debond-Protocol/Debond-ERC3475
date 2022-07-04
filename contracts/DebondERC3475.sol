@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 
 
 import "./interfaces/IDebondBond.sol";
-import "./interfaces/IRedeemableBondCalculator.sol";
+import "./interfaces/IProgressCalculator.sol";
 import "debond-governance-contracts/utils/GovernanceOwnable.sol";
 
 
@@ -24,7 +24,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         uint256 _burnedSupply;
         uint256 _redeemedSupply;
         uint256 classLiquidity;
-        uint256[] values;
+        mapping(uint256 => IERC3475.Values) values;
         mapping(address => uint256) balances;
         mapping(address => mapping(address => uint256)) allowances;
     }
@@ -36,12 +36,9 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     struct Class {
         uint256 id;
         bool exists;
-        string symbol;
-        uint256[] values;
+        mapping(uint256 => IERC3475.Values) values;
+        mapping(uint256 => IERC3475.Metadata) nonceMetadatas;
         uint256 liquidity;
-        mapping(address => mapping(uint256 => bool)) noncesPerAddress;
-        mapping(address => uint256[]) noncesPerAddressArray;
-        mapping(address => mapping(address => bool)) operatorApprovals;
         uint256[] nonceIds;
         mapping(uint256 => Nonce) nonces; // from nonceId given
         uint256 lastNonceIdCreated;
@@ -49,10 +46,10 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     }
 
     mapping(uint256 => Class) internal classes; // from classId given
-    string[] public classInfoDescriptions; // mapping with class.infos
-    string[] public nonceInfoDescriptions; // mapping with nonce.infos
-    mapping(address => mapping(uint256 => bool)) classesPerHolder;
-    mapping(address => uint256[]) public classesPerHolderArray;
+    mapping(uint256 => IERC3475.Metadata) classMetadatas;
+    mapping(address => mapping(address => bool)) operatorApprovals;
+
+
 
     constructor(address _governanceAddress) GovernanceOwnable(_governanceAddress) {}
 
@@ -61,7 +58,10 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         _;
     }
 
-    //TODO onlyGovernance
+    /**
+    * @notice change the Bank Address
+    * @param _bankAddress the new bankAddress to set
+    */
     function setBankAddress(address _bankAddress) onlyGovernance external {
         require(_bankAddress != address(0), "DebondERC3475 Error: Address given is address(0)");
         bankAddress = _bankAddress;
@@ -70,61 +70,235 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
 
     // WRITE
 
+    /**
+    * @notice create a new metadata for classes on the actual bond contract
+    * @param metadataId the identifier of the metadata being created
+    * @param metadata the metadata to create
+    */
+    function createClassMetadata(uint metadataId, IERC3475.Metadata memory metadata) external onlyBank {
+        classMetadatas[metadataId] = metadata;
+    }
+
+    /**
+    * @notice create a new metadata for nonces for a given class
+    * @dev if the classId given doesn't exist, will revert
+    * @param classId the classId
+    * @param metadataId the identifier of the metadata being created
+    * @param metadata the metadata to create
+    */
+    function createNonceMetadata(uint classId, uint metadataId, IERC3475.Metadata memory metadata) external onlyBank {
+        require(classExists(classId), "DebondERC3475: class Id not found");
+        classes[classId].nonceMetadatas[metadataId] = metadata;
+    }
+
+    /**
+    * @notice issuance of bonds
+    * @dev this method is a batch, if any error will revert and will not issue any bonds
+    * @param to the address to issue bonds to
+    * @param transactions represent the classIds, nonces and amounts that need to be issued
+    */
     function issue(address to, Transaction[] calldata transactions) external override onlyBank {
         for (uint i; i < transactions.length; i++) {
             uint classId = transactions[i].classId;
             uint nonceId = transactions[i].nonceId;
-            uint amount = transactions[i]._amount;
+            uint amount = transactions[i].amount;
             require(classes[classId].exists, "ERC3475: only issue bond that has been created");
             require(classes[classId].nonces[nonceId].exists, "ERC-3475: nonceId given not found!");
             require(to != address(0), "ERC3475: can't transfer to the zero address");
             _issue(to, classId, nonceId, amount);
 
-            if (!classesPerHolder[to][classId]) {
-                classesPerHolderArray[to].push(classId);
-                classesPerHolder[to][classId] = true;
-            }
-
             Class storage class = classes[classId];
             class.liquidity += amount;
 
-            if (!class.noncesPerAddress[to][nonceId]) {
-                class.noncesPerAddressArray[to].push(nonceId);
-                class.noncesPerAddress[to][nonceId] = true;
-            }
-
             Nonce storage nonce = class.nonces[nonceId];
-            nonce.classLiquidity = class.liquidity + amount;
+            nonce.classLiquidity = class.liquidity;
         }
         emit Issue(msg.sender, to, transactions);
     }
 
-    function createClass(uint256 classId, string calldata _symbol, uint256[] calldata values) external onlyBank {
+    /**
+    * @notice creation of a new class
+    * @dev metadatas and values length MUST match
+    * @param classId identifier of the new class we want to create
+    * @param metadataIds identifiers of the metadatas (keys for values)
+    * @param values value collection
+    */
+    function createClass(uint256 classId, uint256[] calldata metadataIds, IERC3475.Values[] calldata values) external onlyBank {
+        require(metadataIds.length == values.length, "ERC3475: inputs error");
         require(!classExists(classId), "ERC3475: cannot create a class that already exists");
         Class storage class = classes[classId];
         class.id = classId;
         class.exists = true;
-        class.symbol = _symbol;
-        class.values = values;
+        for (uint256 i; i < metadataIds.length; i++) {
+            class.values[metadataIds[i]] = values[i];
+        }
     }
 
-    function updateLastNonce(uint classId, uint nonceId, uint createdAt) external onlyBank {
-        Class storage class = classes[classId];
-        require(class.exists, "Debond Data: class id given not found");
-        class.lastNonceIdCreated = nonceId;
-        class.lastNonceIdCreatedTimestamp = createdAt;
-    }
-
-    function createNonce(uint256 classId, uint256 nonceId, uint256[] calldata values) external onlyBank {
-        require(classExists(classId), "ERC3475: only issue bond that has been created");
+    /**
+    * @notice creation of a new nonce for a given class
+    * @dev metadatas and values length MUST match
+    * @param classId the classId of the class we want to create nonce on
+    * @param nonceId identifier of the new nonce we want to create
+    * @param metadataIds identifiers of the metadatas (keys for values)
+    * @param values value collection
+    */
+    function createNonce(uint256 classId, uint256 nonceId, uint256[] calldata metadataIds, IERC3475.Values[] calldata values) external onlyBank {
+        require(metadataIds.length == values.length, "ERC3475: inputs error");
+        require(classExists(classId), "DebondERC3475: class Id not found");
         Class storage class = classes[classId];
 
         Nonce storage nonce = class.nonces[nonceId];
-        require(!nonce.exists, "Error ERC-3475: nonceId exists!");
+        require(!nonce.exists, "DebondERC3475: nonceId exists!");
 
         nonce.id = nonceId;
         nonce.exists = true;
-        nonce.values = values;
+        for (uint256 i; i < metadataIds.length; i++) {
+            class.nonces[nonceId].values[metadataIds[i]] = values[i];
+        }
+    }
+
+    /**
+    * @notice update the last nonce informations
+    * @param classId id of the class
+    * @param newNonceId new last nonce id created
+    * @param createdAt timestamp of the creation
+    */
+    function updateLastNonce(uint classId, uint newNonceId, uint createdAt) external onlyBank {
+        Class storage class = classes[classId];
+        require(class.exists, "DebondERC3475: class id given not found");
+        class.lastNonceIdCreated = newNonceId;
+        class.lastNonceIdCreatedTimestamp = createdAt;
+    }
+
+    /**
+    * @notice transfer bonds (if u want to transfer via an approved spender with allowance, use "transferAllowanceFrom")
+    * @param from address we transferring bonds from
+    * @param to address we transferring bonds to
+    * @param transactions classIds, nonceIds and amounts of transfers
+    */
+    function transferFrom(address from, address to, Transaction[] calldata transactions) external override {
+        for (uint i; i < transactions.length; i++) {
+            uint classId = transactions[i].classId;
+            require(classExists(classId), "DebondERC3475: class Id not found");
+            require(msg.sender == from || isApprovedFor(from, msg.sender), "DebondERC3475: caller is not owner nor approved");
+            uint nonceId = transactions[i].nonceId;
+            uint amount = transactions[i].amount;
+
+            _transferFrom(from, to, classId, nonceId, amount);
+        }
+
+        emit Transfer(msg.sender, from, to, transactions);
+    }
+
+    /**
+    * @notice transfer bonds with allowance from spender
+    * @param from address we transferring bonds from
+    * @param to address we transferring bonds to
+    * @param transactions classIds, nonceIds and amounts of transfers
+    */
+    function transferAllowanceFrom(address from, address to, Transaction[] calldata transactions) external override {
+        require(from != address(0), "DebondERC3475: can't transfer from the zero address");
+        require(to != address(0), "DebondERC3475: can't transfer to the zero address");
+        for (uint i; i < transactions.length; i++) {
+            require(
+                transactions[i].amount <= allowance(from, msg.sender, transactions[i].classId, transactions[i].nonceId),
+                "DebondERC3475: caller has not enough allowance"
+            );
+
+            _transferFrom(from, to, transactions[i].classId, transactions[i].nonceId, transactions[i].amount);
+        }
+
+        emit Transfer(msg.sender, from, to, transactions);
+    }
+
+    /**
+    * @notice redeem bonds
+    * @param from address to redeem bonds from
+    * @param transactions classIds, nonceIds and amounts
+    */
+    function redeem(address from, Transaction[] calldata transactions) external override onlyBank {
+        for (uint i; i < transactions.length; i++) {
+            uint classId = transactions[i].classId;
+            uint nonceId = transactions[i].nonceId;
+            uint amount = transactions[i].amount;
+            require(classes[classId].nonces[nonceId].exists, "ERC3475: given Nonce doesn't exist");
+            require(from != address(0), "ERC3475: can't transfer to the zero address");
+            (, uint256 progressRemaining) = getProgress(classId, nonceId);
+            require(progressRemaining == 0, "Bond is not redeemable");
+            _redeem(from, classId, nonceId, amount);
+        }
+        emit Redeem(msg.sender, from, transactions);
+    }
+
+    /**
+    * @notice burn bonds
+    * @param from address to burn bonds from
+    * @param transactions classIds, nonceIds and amounts
+    */
+    function burn(address from, Transaction[] calldata transactions) external override onlyBank {
+        require(from != address(0), "ERC3475: can't transfer to the zero address");
+        for (uint i; i < transactions.length; i++) {
+            require(msg.sender == from || isApprovedFor(from, msg.sender), "ERC3475: caller is not owner nor approved");
+            _burn(from, transactions[i].classId, transactions[i].nonceId, transactions[i].amount);
+        }
+        emit Burn(msg.sender, from, transactions);
+    }
+
+    /**
+    * @param spender address to approve
+    * @param transactions classIds, nonceIds and amounts
+    */
+    function approve(address spender, Transaction[] calldata transactions) external override {
+        for (uint i; i < transactions.length; i++) {
+            classes[transactions[i].classId].nonces[transactions[i].nonceId].allowances[msg.sender][spender] = transactions[i].amount;
+        }
+    }
+
+    /**
+    * @param operator address to set approval for
+    * @param approved true => approved, false => unapproved
+    */
+    function setApprovalFor(address operator, bool approved) external override {
+        operatorApprovals[msg.sender][operator] = approved;
+        emit ApprovalFor(msg.sender, operator, approved);
+    }
+
+    function _transferFrom(address from, address to, uint256 classId, uint256 nonceId, uint256 amount) internal {
+        require(from != address(0), "ERC3475: can't transfer from the zero address");
+        require(to != address(0), "ERC3475: can't transfer to the zero address");
+        require(classes[classId].nonces[nonceId].balances[from] >= amount, "ERC3475: not enough bond to transfer");
+        _transfer(from, to, classId, nonceId, amount);
+    }
+
+    function _transfer(address from, address to, uint256 classId, uint256 nonceId, uint256 amount) internal {
+        require(from != to, "ERC3475: can't transfer to the same address");
+        classes[classId].nonces[nonceId].balances[from] -= amount;
+        classes[classId].nonces[nonceId].balances[to] += amount;
+    }
+
+    function _issue(address to, uint256 classId, uint256 nonceId, uint256 amount) internal {
+        classes[classId].nonces[nonceId].balances[to] += amount;
+        classes[classId].nonces[nonceId]._activeSupply += amount;
+    }
+
+    function _redeem(address from, uint256 classId, uint256 nonceId, uint256 amount) internal {
+        require(classes[classId].nonces[nonceId].balances[from] >= amount);
+        classes[classId].nonces[nonceId].balances[from] -= amount;
+        classes[classId].nonces[nonceId]._activeSupply -= amount;
+        classes[classId].nonces[nonceId]._redeemedSupply += amount;
+    }
+
+    function _burn(address from, uint256 classId, uint256 nonceId, uint256 amount) internal {
+        require(classes[classId].nonces[nonceId].balances[from] >= amount);
+        classes[classId].nonces[nonceId].balances[from] -= amount;
+        classes[classId].nonces[nonceId]._activeSupply -= amount;
+        classes[classId].nonces[nonceId]._burnedSupply += amount;
+    }
+
+    // READS
+
+    function getProgress(uint256 classId, uint256 nonceId) public view returns (uint256 progressAchieved, uint256 progressRemaining) {
+        return IProgressCalculator(bankAddress).getProgress(classId, nonceId);
     }
 
     function getLastNonceCreated(uint classId) external view returns (uint nonceId, uint createdAt) {
@@ -133,10 +307,6 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         nonceId = class.lastNonceIdCreated;
         createdAt = class.lastNonceIdCreatedTimestamp;
         return (nonceId, createdAt);
-    }
-
-    function getNoncesPerAddress(address addr, uint256 classId) public view returns (uint256[] memory) {
-        return classes[classId].noncesPerAddressArray[addr];
     }
 
     function batchActiveSupply(uint256 classId) public view returns (uint256) {
@@ -180,67 +350,6 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         return _batchTotalSupply;
     }
 
-    function transferFrom(address from, address to, Transaction[] calldata transactions) public virtual override {
-        for (uint i; i < transactions.length; i++) {
-            uint classId = transactions[i].classId;
-            uint nonceId = transactions[i].nonceId;
-            uint amount = transactions[i]._amount;
-            require(msg.sender == from || isApprovedFor(from, msg.sender, classId), "ERC3475: caller is not owner nor approved");
-            _transferFrom(from, to, classId, nonceId, amount);
-        }
-
-        emit Transfer(msg.sender, from, to, transactions);
-    }
-
-    function getProgress(uint256 classId, uint256 nonceId) public view returns (uint256 progressAchieved, uint256 progressRemaining) {
-        return IRedeemableBondCalculator(bankAddress).getProgress(classId, nonceId);
-    }
-
-
-    function redeem(address from, Transaction[] calldata transactions) external override onlyBank {
-        for (uint i; i < transactions.length; i++) {
-            uint classId = transactions[i].classId;
-            uint nonceId = transactions[i].nonceId;
-            uint amount = transactions[i]._amount;
-            require(classes[classId].nonces[nonceId].exists, "ERC3475: given Nonce doesn't exist");
-            require(from != address(0), "ERC3475: can't transfer to the zero address");
-            (, uint256 progressRemaining) = getProgress(classId, nonceId);
-            require(progressRemaining == 0, "Bond is not redeemable");
-            _redeem(from, classId, nonceId, amount);
-        }
-        emit Redeem(msg.sender, from, transactions);
-    }
-
-
-    function burn(address from, Transaction[] calldata transactions) external override onlyBank {
-        require(from != address(0), "ERC3475: can't transfer to the zero address");
-        for (uint i; i < transactions.length; i++) {
-            uint classId = transactions[i].classId;
-            uint nonceId = transactions[i].nonceId;
-            uint amount = transactions[i]._amount;
-            _burn(from, classId, nonceId, amount);
-        }
-        emit Burn(msg.sender, from, transactions);
-    }
-
-
-    function approve(address spender, Transaction[] calldata transactions) external override {
-        for (uint i; i < transactions.length; i++) {
-            uint classId = transactions[i].classId;
-            uint nonceId = transactions[i].nonceId;
-            uint amount = transactions[i]._amount;
-            classes[classId].nonces[nonceId].allowances[msg.sender][spender] = amount;
-        }
-    }
-
-
-    function setApprovalFor(address operator, uint256 classId, bool approved) public override {
-        classes[classId].operatorApprovals[msg.sender][operator] = approved;
-        emit ApprovalFor(msg.sender, operator, classId, approved);
-    }
-
-    // READS
-
     function classExists(uint256 classId) public view returns (bool) {
         return classes[classId].exists;
     }
@@ -262,21 +371,17 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         return classes[classId].nonces[nonceId]._activeSupply + classes[classId].nonces[nonceId]._redeemedSupply;
     }
 
-
     function activeSupply(uint256 classId, uint256 nonceId) public override view returns (uint256) {
         return classes[classId].nonces[nonceId]._activeSupply;
     }
-
 
     function burnedSupply(uint256 classId, uint256 nonceId) public override view returns (uint256) {
         return classes[classId].nonces[nonceId]._burnedSupply;
     }
 
-
     function redeemedSupply(uint256 classId, uint256 nonceId) public override view returns (uint256) {
         return classes[classId].nonces[nonceId]._burnedSupply;
     }
-
 
     function balanceOf(address account, uint256 classId, uint256 nonceId) public override view returns (uint256) {
         require(account != address(0), "ERC3475: balance query for the zero address");
@@ -284,63 +389,27 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         return classes[classId].nonces[nonceId].balances[account];
     }
 
-    function classValues(uint256 classId) public view override returns (uint256[] memory) {
-        return classes[classId].values;
+    function classValues(uint256 classId, uint256 metadataId) public view override returns (IERC3475.Values memory) {
+        return classes[classId].values[metadataId];
     }
 
-
-    function nonceValues(uint256 classId, uint256 nonceId) public view override returns (uint256[] memory) {
-        return classes[classId].nonces[nonceId].values;
+    function nonceValues(uint256 classId, uint256 nonceId, uint256 metadataId) public view override returns (IERC3475.Values memory) {
+        return classes[classId].nonces[nonceId].values[metadataId];
     }
 
-    function classMetadata() external view returns (Metadata[] memory m) {
-        string[] memory s = new string[](1);
-        m[0] = Metadata("", "", "", s);
+    function classMetadata(uint256 metadataId) external view returns (Metadata memory) {
+        return classMetadatas[metadataId];
     }
 
-    function nonceMetadata(uint256 classId) external view returns (Metadata[] memory m) {
-        string[] memory s = new string[](1);
-        m[0] = Metadata("", "", "", s);
+    function nonceMetadata(uint256 classId, uint256 metadataId) external view returns (Metadata memory) {
+        return classes[classId].nonceMetadatas[metadataId];
     }
 
-    function allowance(address owner, address spender, uint256 classId, uint256 nonceId) external view returns (uint256) {
+    function allowance(address owner, address spender, uint256 classId, uint256 nonceId) public view returns (uint256) {
         return classes[classId].nonces[nonceId].allowances[owner][spender];
     }
 
-
-    function isApprovedFor(address owner, address operator, uint256 classId) public view virtual override returns (bool) {
-        return classes[classId].operatorApprovals[owner][operator];
-    }
-
-    function _transferFrom(address from, address to, uint256 classId, uint256 nonceId, uint256 amount) internal {
-        require(from != address(0), "ERC3475: can't transfer from the zero address");
-        require(to != address(0), "ERC3475: can't transfer to the zero address");
-        require(classes[classId].nonces[nonceId].balances[from] >= amount, "ERC3475: not enough bond to transfer");
-        _transfer(from, to, classId, nonceId, amount);
-    }
-
-    function _transfer(address from, address to, uint256 classId, uint256 nonceId, uint256 amount) internal {
-        require(from != to, "ERC3475: can't transfer to the same address");
-        classes[classId].nonces[nonceId].balances[from] -= amount;
-        classes[classId].nonces[nonceId].balances[to] += amount;
-    }
-
-    function _issue(address to, uint256 classId, uint256 nonceId, uint256 amount) internal {
-        classes[classId].nonces[nonceId].balances[to] += amount;
-        classes[classId].nonces[nonceId]._activeSupply += amount;
-    }
-
-    function _redeem(address from, uint256 classId, uint256 nonceId, uint256 amount) internal {
-        require(classes[classId].nonces[nonceId].balances[from] >= amount);
-        classes[classId].nonces[nonceId].balances[from] -= amount;
-        classes[classId].nonces[nonceId]._activeSupply -= amount;
-        classes[classId].nonces[nonceId]._redeemedSupply += amount;
-    }
-
-    function _burn(address from, uint256 classId, uint256 nonceId, uint256 amount) internal {
-        require(classes[classId].nonces[nonceId].balances[from] >= amount);
-        classes[classId].nonces[nonceId].balances[from] -= amount;
-        classes[classId].nonces[nonceId]._activeSupply -= amount;
-        classes[classId].nonces[nonceId]._burnedSupply += amount;
+    function isApprovedFor(address owner, address operator) public view override returns (bool) {
+        return operatorApprovals[owner][operator];
     }
 }
