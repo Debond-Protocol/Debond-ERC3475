@@ -38,8 +38,7 @@ contract('Bond', async (accounts: string[]) => {
     let progressCalculatorContract: ProgressCalculatorInstance
 
     const DBIT_FIX_6MTH_CLASS_ID = 0;
-    const USDC_FIX_6MTH_CLASS_ID = 1;
-    const [governance, bank, user1, user2, operator, DBITAddress, USDCAddress] = accounts;
+    const [governance, bank, user1, user2, operator, spender, DBITAddress] = accounts;
 
     const now = parseInt(Date.now().toString().substring(-3));
     const classMetadatas: Metadata[] = [
@@ -112,11 +111,11 @@ contract('Bond', async (accounts: string[]) => {
 
     it('Should Issue bonds to an account, only the Bank can do that action', async () => {
         const transactions: Transaction[] = [
-            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('3000')}
+            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('5000')}
         ]
         await bondContract.issue(user1, transactions, {from: bank});
         const buyerBalance = await bondContract.balanceOf(user1, DBIT_FIX_6MTH_CLASS_ID, 0);
-        assert.isTrue(web3.utils.toWei('3000') == buyerBalance.toString())
+        assert.isTrue(web3.utils.toWei('5000') == buyerBalance.toString())
 
     })
 
@@ -127,7 +126,7 @@ contract('Bond', async (accounts: string[]) => {
         await bondContract.transferFrom(user1, user2, transactions, {from: user1});
         const user1Balance = await bondContract.balanceOf(user1, DBIT_FIX_6MTH_CLASS_ID, 0);
         const user2Balance = await bondContract.balanceOf(user2, DBIT_FIX_6MTH_CLASS_ID, 0);
-        assert.isTrue(web3.utils.toWei('1500') == user1Balance.toString())
+        assert.isTrue(web3.utils.toWei('3500') == user1Balance.toString())
         assert.isTrue(web3.utils.toWei('1500') == user2Balance.toString())
     })
 
@@ -145,8 +144,31 @@ contract('Bond', async (accounts: string[]) => {
         await bondContract.transferFrom(user1, user2, transactions, {from: operator});
         const user1Balance = await bondContract.balanceOf(user1, DBIT_FIX_6MTH_CLASS_ID, 0);
         const user2Balance = await bondContract.balanceOf(user2, DBIT_FIX_6MTH_CLASS_ID, 0);
-        assert.isTrue('0' == user1Balance.toString())
+        assert.isTrue(web3.utils.toWei('2000') == user1Balance.toString())
         assert.isTrue(web3.utils.toWei('3000') == user2Balance.toString())
+    })
+
+    it('Should add allowance for a spender', async () => {
+        const transactions: Transaction[] = [
+            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('2000')}
+        ]
+        await bondContract.approve(spender, transactions,{from: user1});
+        await bondContract.approve(spender, transactions,{from: user2});
+        const spenderAllowanceOnUser1 = await bondContract.allowance(user1, spender, DBIT_FIX_6MTH_CLASS_ID, 0);
+        const spenderAllowanceOnUser2 = await bondContract.allowance(user2, spender, DBIT_FIX_6MTH_CLASS_ID, 0);
+        assert.isTrue(spenderAllowanceOnUser1.toString() == web3.utils.toWei('2000'))
+        assert.isTrue(spenderAllowanceOnUser2.toString() == web3.utils.toWei('2000'))
+    })
+
+    it('Should be able for spender to transfer allowance bonds from a user to an other', async () => {
+        const transactions: Transaction[] = [
+            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('2000')}
+        ]
+        await bondContract.transferAllowanceFrom(user1, user2, transactions, {from: spender});
+        const user1Balance = await bondContract.balanceOf(user1, DBIT_FIX_6MTH_CLASS_ID, 0);
+        const user2Balance = await bondContract.balanceOf(user2, DBIT_FIX_6MTH_CLASS_ID, 0);
+        assert.isTrue('0' == user1Balance.toString())
+        assert.isTrue(web3.utils.toWei('5000') == user2Balance.toString())
     })
 
     it('Should be able to burn bonds from user, only bank can do this action', async () => {
@@ -160,7 +182,7 @@ contract('Bond', async (accounts: string[]) => {
         await bondContract.burn(user2, transactions, {from: bank});
         const user2Balance = await bondContract.balanceOf(user2, DBIT_FIX_6MTH_CLASS_ID, 0);
         const burnedSupply = await bondContract.burnedSupply(DBIT_FIX_6MTH_CLASS_ID, 0);
-        assert.isTrue(web3.utils.toWei('2000') == user2Balance.toString())
+        assert.isTrue(web3.utils.toWei('4000') == user2Balance.toString())
         assert.isTrue(web3.utils.toWei('1000') == burnedSupply.toString())
     })
 
@@ -174,7 +196,7 @@ contract('Bond', async (accounts: string[]) => {
         await progressCalculatorContract.redeem(user2, transactions);
         const user2Balance = await bondContract.balanceOf(user2, DBIT_FIX_6MTH_CLASS_ID, 0);
         const redeemedSupply = await bondContract.redeemedSupply(DBIT_FIX_6MTH_CLASS_ID, 0);
-        assert.isTrue(web3.utils.toWei('1000') == user2Balance.toString())
+        assert.isTrue(web3.utils.toWei('3000') == user2Balance.toString())
         assert.isTrue(web3.utils.toWei('1000') == redeemedSupply.toString())
         await bondContract.setBankAddress(bank);
 
