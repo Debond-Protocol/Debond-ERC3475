@@ -58,22 +58,31 @@ This package consist of extended implementation of ERC3475 standard interface  f
 4. Also functions concerning the management of the `Metadata` (Both class and nonce) is done by the bank, but invoked only via the governance contract. 
 
 
-## Setup: 
+## Usecase:
 
-1. deployment: 
-```bash
+for inheriting the functions from debondBond: 
 
-##1. Create an .env file with GOVERNANCE keysetup
-##2. Then running the following command: 
-> npm run deploy 
+```Solidity
+import "debond-erc3475-contract/interfaces/IDebondBond.sol";
 
-##3. Then setting up the bank and exchange address.
+// @node : for all read functions there are no issues, but for the bond manipulaton functions they needs to be insured that the contractAddress is approved  by the bond owner (if to be approved for one class or multiples). 
+
+contract BondOperator is IDebondBond {
+
+    error NOT_APPROVED();    
+
+    address _bondAddress;
+
+    modifier isApprovedForAllClass(address owner ) {
+    if(!IDebondBond(bondAddress).isApprovedFor(owner,address(this))) revert   NOT_APPROVED();  
+    }
+
+    constructor(address BondAddress, ......) {
+    
+    }
+}
 
 ```
-
-2. for inheriting the debondBond interface: install the debond-erc3475-contract using npm.
-
-
 ## Security Considerations/ Dependencies:
 1.The security dependency is via the bank for most of the state changing functions along with checks , so insure that the  applications should  set the address of the bank correctly once deployed and also have thorough analysis of hte bank contract.
 

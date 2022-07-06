@@ -1,0 +1,35 @@
+name: Publish NPM
+
+on: 
+  branches: [main,documentation]
+  release:
+    types: [created]  
+
+jobs: 
+  build: 
+    runs-on: ubuntu-release
+  steps: 
+    - name: Checkout NPM.
+      uses: actions/checkout@v3
+    - name: Setup Node.
+      uses: actions/setup-node@v3
+      with:
+        node-version: 14
+        registry-url: 'https://registry.npmjs.org'
+    - name: going to contracts repo 
+      run: cd contracts/
+   
+    - name: root repo for testing
+      run: |
+       cd ../
+       npm ci 
+       npm test
+    
+    - name: publishing package to NPM
+      run: npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+
+
+
