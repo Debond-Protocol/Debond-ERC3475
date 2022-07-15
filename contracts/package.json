@@ -1,11 +1,28 @@
 {
-  "name": "debond-erc3475-contracts",
-  "version": "0.0.3",
-  "description": "Debond Protocol implementation of IERC3475",
+  "name": "@debond-protocol/debond-erc3475-contracts",
+  "version": "0.0.1",
+  "description": "Debond Protocol ERC 3475 Contracts",
   "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "info@debond.org",
-  "license": "ISC"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Debond-Protocol/Debond-ERC3475.git"
+  },
+  "keywords": [
+    "debond",
+    "protocol",
+    "erc-3475",
+    "contract"
+  ],
+  "author": "Debond Protocol <info@debond.org>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Debond-Protocol/Debond-ERC3475/issues"
+  },
+  "homepage": "https://github.com/Debond-Protocol/Debond-ERC3475#readme"
 }

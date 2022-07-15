@@ -1,4 +1,4 @@
-require("ts-node").register({files: true});
+require("ts-node").register({ files: true });
 const HDWalletProvider = require("truffle-hdwallet-provider");
 require('dotenv').config();
 const Web3 = require("web3");
@@ -12,11 +12,11 @@ module.exports = {
   networks: {
     development: {
       host: "127.0.0.1",
-      port: 8545,
+      port: 7545,
       network_id: "*",
     },
     rinkeby: {
-      provider: function() {
+      provider: function () {
         return new HDWalletProvider(process.env.TESTNET_PRIVATE_KEY, `https://rinkeby.infura.io/v3/${process.env.INFURA_Access_Token}`);
       },
       network_id: 4,
@@ -24,7 +24,7 @@ module.exports = {
       // gasPrice: web3.utils.toWei('1', 'gwei')
     },
     ropsten: {
-      provider: function() {
+      provider: function () {
         return new HDWalletProvider(process.env.TESTNET_PRIVATE_KEY, `https://ropsten.infura.io/v3/${process.env.INFURA_Access_Token}`);
       },
       network_id: 3,

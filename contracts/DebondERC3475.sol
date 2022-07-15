@@ -17,7 +17,7 @@ pragma solidity ^0.8.0;
 
 import "./interfaces/IDebondBond.sol";
 import "./interfaces/IProgressCalculator.sol";
-import "debond-governance-contracts/utils/GovernanceOwnable.sol";
+import "@debond-protocol/debond-governance-contracts/utils/GovernanceOwnable.sol";
 
 
 contract DebondERC3475 is IDebondBond, GovernanceOwnable {
