@@ -192,6 +192,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
 
         nonce.id = nonceId;
         nonce.exists = true;
+        classes[classId].nonceIds.push(nonceId);
         for (uint256 i; i < metadataIds.length; i++) {
             class.nonces[nonceId].values[metadataIds[i]] = values[i];
         }
@@ -408,7 +409,11 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     }
 
     function totalSupply(uint256 classId, uint256 nonceId) public override view returns (uint256) {
-        return classes[classId].nonces[nonceId]._activeSupply + classes[classId].nonces[nonceId]._redeemedSupply;
+        return
+        classes[classId].nonces[nonceId]._activeSupply +
+        classes[classId].nonces[nonceId]._redeemedSupply +
+        classes[classId].nonces[nonceId]._burnedSupply;
+
     }
 
     function activeSupply(uint256 classId, uint256 nonceId) public override view returns (uint256) {
@@ -420,7 +425,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     }
 
     function redeemedSupply(uint256 classId, uint256 nonceId) public override view returns (uint256) {
-        return classes[classId].nonces[nonceId]._burnedSupply;
+        return classes[classId].nonces[nonceId]._redeemedSupply;
     }
 
     function balanceOf(address account, uint256 classId, uint256 nonceId) public override view returns (uint256) {

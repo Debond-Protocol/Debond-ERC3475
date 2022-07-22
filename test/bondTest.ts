@@ -107,6 +107,7 @@ contract('Bond', async (accounts: string[]) => {
         await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 0, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
         const nonceExists = await bondContract.nonceExists(DBIT_FIX_6MTH_CLASS_ID, 0)
         const nonceIssuanceDate = (await bondContract.nonceValues(DBIT_FIX_6MTH_CLASS_ID, 0, 0)).uintValue
+        console.log(nonceIssuanceDate, now)
         assert.isTrue(nonceExists);
         assert.isTrue(nonceIssuanceDate == now);
     })
