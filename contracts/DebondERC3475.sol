@@ -399,12 +399,34 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         return classes[classId].nonces[nonceId].exists;
     }
 
-    function classLiquidity(uint256 classId) external view returns (uint256) {
+    function classLiquidity(uint256 classId) public view returns (uint256) {
         return classes[classId].liquidity;
     }
 
+    function classLiquidityBatch(uint256[] calldata classIds) external view returns (uint256[] memory) {
+        uint256[] memory liquidities = new uint[](classIds.length);
+        for(uint i; i < classIds.length; i++) {
+            liquidities[i] = classLiquidity(classIds[i]);
+        }
+        return liquidities;
+    }
+
     function classLiquidityAtNonce(uint256 classId, uint256 nonceId) external view returns (uint256) {
-        require(nonceExists(classId, nonceId), "DebondERC3475 Error: nonce not found");
+        // if class has no liquidity it means no liquidity on any nonce
+        if(classes[classId].liquidity == 0) {
+            return 0;
+        }
+        // we check if the nonceId given is greater than the last nonce Issued
+        uint lastNonce = classes[classId].lastNonceIdCreated;
+        if(nonceId > lastNonce) {
+            return classes[classId].nonces[lastNonce].classLiquidity;
+        }
+
+        if(!nonceExists(classId, nonceId)) {
+            while(!nonceExists(classId, nonceId) && nonceId > 0) {
+                --nonceId;
+            }
+        }
         return classes[classId].nonces[nonceId].classLiquidity;
     }
 

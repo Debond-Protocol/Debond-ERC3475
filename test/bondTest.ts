@@ -211,27 +211,43 @@ contract('Bond', async (accounts: string[]) => {
 
     })
 
-    it('Should give all the nonces per class for a given address', async () => {
-        async function getUser1AllToTransactions(event: string): Promise<Transaction[]> {
-            return (await bondContract.getPastEvents(event,
-                {
-                    filter: {
-                        _to: user1
-                    },
-                    fromBlock: 0
-                }
-            )).map(e => {
-                return e.returnValues._transactions as Transaction[];
-            }).flat();
-        }
-        const t = await Promise.all([
-            getUser1AllToTransactions('Issue'),
-            getUser1AllToTransactions('Transfer')
-        ]).then((res: Awaited<Transaction[]>[]) => {
-            return res.flat()
-        })
+    it('Should get the liquidity at nonce for a class given', async () => {
+        const values: Value[] = [
+            {...defaultValue, uintValue: now},
+            {...defaultValue, uintValue: now }, // 6 months
+        ]
+        await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 1, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
+        await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 2, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
+        await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 6, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
+        await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 9, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
+        await bondContract.updateLastNonce(DBIT_FIX_6MTH_CLASS_ID, 9, now, {from: bank});
 
-        console.log(t);
+
+        const transactions: Transaction[] = [
+            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 1, amount: web3.utils.toWei('5000')},
+            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 2, amount: web3.utils.toWei('5000')},
+            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 6, amount: web3.utils.toWei('5000')},
+            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 9, amount: web3.utils.toWei('5000')}
+        ]
+        await bondContract.issue(user1, transactions, {from: bank});
+
+        const liq0 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 0)
+        const liq1 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 1)
+        const liq4 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 4)
+        const liq7 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 7)
+        const liq30 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 30)
+
+        assert.equal(liq0.toString(), web3.utils.toWei('5000'))
+        assert.equal(liq1.toString(), web3.utils.toWei('10000'))
+        assert.equal(liq4.toString(), web3.utils.toWei('15000'))
+        assert.equal(liq7.toString(), web3.utils.toWei('20000'))
+        assert.equal(liq30.toString(), web3.utils.toWei('25000'))
+    })
+
+    it('Should get the liquidity class', async () => {
+      const liquidities = await bondContract.classLiquidityBatch([DBIT_FIX_6MTH_CLASS_ID]);
+      console.log(liquidities.map(l => l.toString()));
+      assert.equal(liquidities[0].toString(), web3.utils.toWei('25000'));
     })
 });
 
