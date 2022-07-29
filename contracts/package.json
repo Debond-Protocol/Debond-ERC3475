@@ -1,6 +1,6 @@
 {
   "name": "@debond-protocol/debond-erc3475-contracts",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Debond Protocol ERC 3475 Contracts",
   "main": "index.js",
   "directories": {
