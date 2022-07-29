@@ -41,6 +41,8 @@ interface IDebondBond is IERC3475{
 
     function classLiquidity(uint256 classId) external view returns (uint256);
 
+    function classLiquidityBatch(uint256[] calldata classIds) external view returns (uint256[] calldata);
+
     function classLiquidityAtNonce(uint256 classId, uint256 nonceId) external view returns (uint256);
 }
 
