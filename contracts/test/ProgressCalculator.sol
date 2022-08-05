@@ -16,7 +16,7 @@ contract ProgressCalculator is IProgressCalculator {
         bondContract = _bondContract;
     }
 
-    function getProgress(uint256 classId, uint256 nonceId) external view returns (uint256 progressAchieved, uint256 progressRemaining) {
+    function getProgress(uint256 classId, uint256 nonceId) external pure returns (uint256 progressAchieved, uint256 progressRemaining) {
         progressAchieved = 100;
         progressRemaining = 0;
     }

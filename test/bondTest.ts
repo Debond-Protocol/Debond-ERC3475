@@ -112,12 +112,6 @@ contract('Bond', async (accounts: string[]) => {
         assert.isTrue(nonceIssuanceDate == now);
     })
 
-    it('Should update last nonce created, only the Bank can do that action', async () => {
-        await bondContract.updateLastNonce(DBIT_FIX_6MTH_CLASS_ID, 0, now, {from: bank});
-        const lastCreatedNonceDate = await bondContract.getLastNonceCreated(DBIT_FIX_6MTH_CLASS_ID);
-        assert.isTrue(lastCreatedNonceDate["1"] == now);
-    })
-
     it('Should Issue bonds to an account, only the Bank can do that action', async () => {
         const transactions: Transaction[] = [
             {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('5000')}
@@ -220,7 +214,6 @@ contract('Bond', async (accounts: string[]) => {
         await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 2, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
         await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 6, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
         await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 9, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
-        await bondContract.updateLastNonce(DBIT_FIX_6MTH_CLASS_ID, 9, now, {from: bank});
 
 
         const transactions: Transaction[] = [
@@ -231,11 +224,11 @@ contract('Bond', async (accounts: string[]) => {
         ]
         await bondContract.issue(user1, transactions, {from: bank});
 
-        const liq0 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 0)
-        const liq1 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 1)
-        const liq4 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 4)
-        const liq7 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 7)
-        const liq30 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 30)
+        const liq0 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 0, 0)
+        const liq1 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 1, 0)
+        const liq4 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 4, 0)
+        const liq7 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 7, 0)
+        const liq30 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 30, 0)
 
         assert.equal(liq0.toString(), web3.utils.toWei('5000'))
         assert.equal(liq1.toString(), web3.utils.toWei('10000'))

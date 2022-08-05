@@ -35,6 +35,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         uint256 _burnedSupply;
         uint256 _redeemedSupply;
         uint256 classLiquidity;
+        uint256 previousNonceIdCreated;
         mapping(uint256 => IERC3475.Values) values;
         mapping(address => uint256) balances;
         mapping(address => mapping(address => uint256)) allowances;
@@ -192,23 +193,13 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
 
         nonce.id = nonceId;
         nonce.exists = true;
+        nonce.previousNonceIdCreated = class.lastNonceIdCreated;
         classes[classId].nonceIds.push(nonceId);
         for (uint256 i; i < metadataIds.length; i++) {
             class.nonces[nonceId].values[metadataIds[i]] = values[i];
         }
-    }
-
-    /**
-    * @notice update the last nonce informations
-    * @param classId id of the class
-    * @param newNonceId new last nonce id created
-    * @param createdAt timestamp of the creation
-    */
-    function updateLastNonce(uint classId, uint newNonceId, uint createdAt) external onlyBank {
-        Class storage class = classes[classId];
-        require(class.exists, "DebondERC3475: class id given not found");
-        class.lastNonceIdCreated = newNonceId;
-        class.lastNonceIdCreatedTimestamp = createdAt;
+        class.lastNonceIdCreated = nonceId;
+        class.lastNonceIdCreatedTimestamp = block.timestamp;
     }
 
     /**
@@ -361,36 +352,6 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         return _batchActiveSupply;
     }
 
-    function batchBurnedSupply(uint256 classId) public view returns (uint256) {
-        uint256 _batchBurnedSupply;
-        uint256[] memory nonces = classes[classId].nonceIds;
-
-        for (uint256 i = 0; i <= nonces.length; i++) {
-            _batchBurnedSupply += burnedSupply(classId, nonces[i]);
-        }
-        return _batchBurnedSupply;
-    }
-
-    function batchRedeemedSupply(uint256 classId) public view returns (uint256) {
-        uint256 _batchRedeemedSupply;
-        uint256[] memory nonces = classes[classId].nonceIds;
-
-        for (uint256 i = 0; i <= nonces.length; i++) {
-            _batchRedeemedSupply += redeemedSupply(classId, nonces[i]);
-        }
-        return _batchRedeemedSupply;
-    }
-
-    function batchTotalSupply(uint256 classId) public view returns (uint256) {
-        uint256 _batchTotalSupply;
-        uint256[] memory nonces = classes[classId].nonceIds;
-
-        for (uint256 i = 0; i <= nonces.length; i++) {
-            _batchTotalSupply += totalSupply(classId, nonces[i]);
-        }
-        return _batchTotalSupply;
-    }
-
     function classExists(uint256 classId) public view returns (bool) {
         return classes[classId].exists;
     }
@@ -411,7 +372,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         return liquidities;
     }
 
-    function classLiquidityAtNonce(uint256 classId, uint256 nonceId) external view returns (uint256) {
+    function classLiquidityAtNonce(uint256 classId, uint256 nonceId, uint256 searchNonceLimit) external view returns (uint256) {
         // if class has no liquidity it means no liquidity on any nonce
         if(classes[classId].liquidity == 0) {
             return 0;
@@ -423,7 +384,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         }
 
         if(!nonceExists(classId, nonceId)) {
-            while(!nonceExists(classId, nonceId) && nonceId > 0) {
+            while(!nonceExists(classId, nonceId) && nonceId > searchNonceLimit) {
                 --nonceId;
             }
         }
