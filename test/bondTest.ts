@@ -38,7 +38,7 @@ contract('Bond', async (accounts: string[]) => {
     let progressCalculatorContract: ProgressCalculatorInstance
 
     const DBIT_FIX_6MTH_CLASS_ID = 0;
-    const [governance, bank, user1, user2, operator, spender, DBITAddress] = accounts;
+    const [governance, bondManager, user1, user2, operator, spender, DBITAddress] = accounts;
 
     const now = parseInt(Date.now().toString().substring(-3));
     const classMetadatas: Metadata[] = [
@@ -65,7 +65,7 @@ contract('Bond', async (accounts: string[]) => {
             const index = classMetadatas.indexOf(metadata);
             metadataIds.push(index)
         }
-        await bondContract.createClassMetadataBatch(metadataIds, classMetadatas, {from: bank})
+        await bondContract.createClassMetadataBatch(metadataIds, classMetadatas, {from: bondManager})
         const metadata = await bondContract.classMetadata(0);
         assert.isTrue(metadata.title == classMetadatas[0].title);
         assert.isTrue(metadata.types == classMetadatas[0].types);
@@ -79,7 +79,7 @@ contract('Bond', async (accounts: string[]) => {
             {...defaultValue, uintValue: 0},
             {...defaultValue, uintValue: 3600 * 24 * 180 }, // 6 months
         ]
-        await bondContract.createClass(DBIT_FIX_6MTH_CLASS_ID, classMetadatas.map(metadata => classMetadatas.indexOf(metadata)), values, {from: bank});
+        await bondContract.createClass(DBIT_FIX_6MTH_CLASS_ID, classMetadatas.map(metadata => classMetadatas.indexOf(metadata)), values, {from: bondManager});
         const classExists = await bondContract.classExists(DBIT_FIX_6MTH_CLASS_ID)
         const classTokenAddress = (await bondContract.classValues(DBIT_FIX_6MTH_CLASS_ID, 1)).addressValue
         assert.isTrue(classExists);
@@ -92,7 +92,7 @@ contract('Bond', async (accounts: string[]) => {
             const index = nonceMetadatas.indexOf(metadata);
             metadataIds.push(index)
         }
-        await bondContract.createNonceMetadataBatch(DBIT_FIX_6MTH_CLASS_ID, metadataIds, nonceMetadatas, {from: bank})
+        await bondContract.createNonceMetadataBatch(DBIT_FIX_6MTH_CLASS_ID, metadataIds, nonceMetadatas, {from: bondManager})
         const metadata = await bondContract.nonceMetadata(DBIT_FIX_6MTH_CLASS_ID, 0);
         assert.isTrue(metadata.title == nonceMetadatas[0].title);
         assert.isTrue(metadata.types == nonceMetadatas[0].types);
@@ -104,7 +104,7 @@ contract('Bond', async (accounts: string[]) => {
             {...defaultValue, uintValue: now},
             {...defaultValue, uintValue: now }, // 6 months
         ]
-        await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 0, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
+        await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 0, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bondManager});
         const nonceExists = await bondContract.nonceExists(DBIT_FIX_6MTH_CLASS_ID, 0)
         const nonceIssuanceDate = (await bondContract.nonceValues(DBIT_FIX_6MTH_CLASS_ID, 0, 0)).uintValue
         console.log(nonceIssuanceDate, now)
@@ -116,7 +116,7 @@ contract('Bond', async (accounts: string[]) => {
         const transactions: Transaction[] = [
             {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('5000')}
         ]
-        await bondContract.issue(user1, transactions, {from: bank});
+        await bondContract.issue(user1, transactions, {from: bondManager});
         const buyerBalance = await bondContract.balanceOf(user1, DBIT_FIX_6MTH_CLASS_ID, 0);
         assert.isTrue(web3.utils.toWei('5000') == buyerBalance.toString())
 
@@ -177,70 +177,82 @@ contract('Bond', async (accounts: string[]) => {
     it('Should be able to burn bonds from user, only bank can do this action', async () => {
 
         // we need to set bank as operator for user
-        await bondContract.setApprovalFor(bank, true,{from: user2});
+        await bondContract.setApprovalFor(bondManager, true,{from: user2});
 
         const transactions: Transaction[] = [
             {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('1000')}
         ]
-        await bondContract.burn(user2, transactions, {from: bank});
+        await bondContract.burn(user2, transactions, {from: bondManager});
         const user2Balance = await bondContract.balanceOf(user2, DBIT_FIX_6MTH_CLASS_ID, 0);
         const burnedSupply = await bondContract.burnedSupply(DBIT_FIX_6MTH_CLASS_ID, 0);
         assert.isTrue(web3.utils.toWei('4000') == user2Balance.toString())
         assert.isTrue(web3.utils.toWei('1000') == burnedSupply.toString())
     })
 
-    it('Should be able to redeem bonds from user, only bank can do this action', async () => {
+    it('Should be able to redeem bonds from user', async () => {
 
         const transactions: Transaction[] = [
             {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('1000')}
         ]
         // progressCalculator is bank
-        await bondContract.setBankAddress(progressCalculatorContract.address);
-        await progressCalculatorContract.redeem(user2, transactions);
+        await bondContract.setBondManagerAddress(progressCalculatorContract.address);
+        await bondContract.redeem(user2, transactions);
         const user2Balance = await bondContract.balanceOf(user2, DBIT_FIX_6MTH_CLASS_ID, 0);
         const redeemedSupply = await bondContract.redeemedSupply(DBIT_FIX_6MTH_CLASS_ID, 0);
         assert.isTrue(web3.utils.toWei('3000') == user2Balance.toString())
         assert.isTrue(web3.utils.toWei('1000') == redeemedSupply.toString())
-        await bondContract.setBankAddress(bank);
+        await bondContract.setBondManagerAddress(bondManager);
 
     })
 
     it('Should get the liquidity at nonce for a class given', async () => {
-        const values: Value[] = [
+        const classValues: Value[] = [
+            {...defaultValue, stringValue: "DBIT"},
+            {...defaultValue, addressValue: DBITAddress},
+            {...defaultValue, uintValue: 0},
+            {...defaultValue, uintValue: 3600 * 24 * 180 }, // 6 months
+        ]
+        await bondContract.createClass(8, classMetadatas.map(metadata => classMetadatas.indexOf(metadata)), classValues, {from: bondManager});
+
+        const nonceValues: Value[] = [
             {...defaultValue, uintValue: now},
             {...defaultValue, uintValue: now }, // 6 months
         ]
-        await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 1, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
-        await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 2, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
-        await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 6, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
-        await bondContract.createNonce(DBIT_FIX_6MTH_CLASS_ID, 9, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), values, {from: bank});
+        const transaction0: Transaction[] = [{classId: 8, nonceId: 1, amount: web3.utils.toWei('5000')},]
+        const transaction1: Transaction[] = [{classId: 8, nonceId: 2, amount: web3.utils.toWei('5000')},]
+        const transaction2: Transaction[] = [{classId: 8, nonceId: 6, amount: web3.utils.toWei('5000')},]
+        const transaction3: Transaction[] = [{classId: 8, nonceId: 9, amount: web3.utils.toWei('5000')}]
+        await bondContract.createNonce(8, 1, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), nonceValues, {from: bondManager});
+        await bondContract.issue(user1, transaction0, {from: bondManager});
+
+        await bondContract.createNonce(8, 2, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), nonceValues, {from: bondManager});
+        await bondContract.issue(user1, transaction1, {from: bondManager});
+
+        await bondContract.createNonce(8, 6, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), nonceValues, {from: bondManager});
+        await bondContract.issue(user1, transaction2, {from: bondManager});
+
+        await bondContract.createNonce(8, 9, nonceMetadatas.map(metadata => nonceMetadatas.indexOf(metadata)), nonceValues, {from: bondManager});
+        await bondContract.issue(user1, transaction3, {from: bondManager});
 
 
-        const transactions: Transaction[] = [
-            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 1, amount: web3.utils.toWei('5000')},
-            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 2, amount: web3.utils.toWei('5000')},
-            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 6, amount: web3.utils.toWei('5000')},
-            {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 9, amount: web3.utils.toWei('5000')}
-        ]
-        await bondContract.issue(user1, transactions, {from: bank});
+        const liq0 = await bondContract.classLiquidityAtNonce(8, 0, 0)
+        const liq1 = await bondContract.classLiquidityAtNonce(8, 1, 0)
+        const liq4 = await bondContract.classLiquidityAtNonce(8, 4, 0)
+        const liq7 = await bondContract.classLiquidityAtNonce(8, 7, 0)
+        const liq30 = await bondContract.classLiquidityAtNonce(8, 30, 0)
 
-        const liq0 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 0, 0)
-        const liq1 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 1, 0)
-        const liq4 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 4, 0)
-        const liq7 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 7, 0)
-        const liq30 = await bondContract.classLiquidityAtNonce(DBIT_FIX_6MTH_CLASS_ID, 30, 0)
-
-        assert.equal(liq0.toString(), web3.utils.toWei('5000'))
-        assert.equal(liq1.toString(), web3.utils.toWei('10000'))
-        assert.equal(liq4.toString(), web3.utils.toWei('15000'))
-        assert.equal(liq7.toString(), web3.utils.toWei('20000'))
-        assert.equal(liq30.toString(), web3.utils.toWei('25000'))
+        assert.equal(liq0.toString(), web3.utils.toWei('0'))
+        assert.equal(liq1.toString(), web3.utils.toWei('5000'))
+        assert.equal(liq4.toString(), web3.utils.toWei('10000'))
+        assert.equal(liq7.toString(), web3.utils.toWei('15000'))
+        assert.equal(liq30.toString(), web3.utils.toWei('20000'))
     })
 
     it('Should get the liquidity class', async () => {
-      const liquidities = await bondContract.classLiquidityBatch([DBIT_FIX_6MTH_CLASS_ID]);
+      const liquidities = await bondContract.classLiquidityBatch([0, 8]);
       console.log(liquidities.map(l => l.toString()));
-      assert.equal(liquidities[0].toString(), web3.utils.toWei('25000'));
+      assert.equal(liquidities[0].toString(), web3.utils.toWei('5000'));
+      assert.equal(liquidities[1].toString(), web3.utils.toWei('20000'));
     })
 });
 
