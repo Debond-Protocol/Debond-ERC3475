@@ -64,14 +64,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
 
 
 
-    constructor(
-        address _redeemableAddress,
-        address _bondManagerAddress,
-        address _governanceAddress
-    ) GovernanceOwnable(_governanceAddress) {
-        redeemableAddress = _redeemableAddress;
-        bondManagerAddress = _bondManagerAddress;
-    }
+    constructor(address _governanceAddress) GovernanceOwnable(_governanceAddress) {}
 
     modifier onlyBondManager() {
         require(msg.sender == bondManagerAddress, "DebondERC3475 Error: Not authorized");
@@ -359,17 +352,6 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         nonceId = class.lastNonceIdCreated;
         createdAt = class.lastNonceIdCreatedTimestamp;
         return (nonceId, createdAt);
-    }
-
-    function batchActiveSupply(uint256 classId) public view returns (uint256) {
-        uint256 _batchActiveSupply;
-        uint256[] memory nonces = classes[classId].nonceIds;
-        // _lastBondNonces can be recovered from the last message of the nonceId
-        // @drisky we can indeed
-        for (uint256 i = 0; i <= nonces.length; i++) {
-            _batchActiveSupply += activeSupply(classId, nonces[i]);
-        }
-        return _batchActiveSupply;
     }
 
     function classExists(uint256 classId) public view returns (bool) {
