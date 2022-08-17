@@ -1,6 +1,5 @@
 pragma solidity ^0.8.0;
 
-
 // SPDX-License-Identifier: apache 2.0
 /*
     Copyright 2022 Debond Protocol <info@debond.org>
@@ -14,7 +13,6 @@ pragma solidity ^0.8.0;
     See the License for the specific language governing permissions and
     limitations under the License.
 */
-
 import "erc3475/IERC3475.sol";
 
 
@@ -33,8 +31,6 @@ interface IDebondBond is IERC3475{
 
     function createClass(uint256 classId, uint256[] calldata metadataIds, IERC3475.Values[] calldata values) external;
 
-    function updateLastNonce(uint classId, uint nonceId, uint createdAt) external;
-
     function getLastNonceCreated(uint classId) external view returns(uint nonceId, uint createdAt);
 
     function classExists(uint256 classId) external view returns (bool);
@@ -43,6 +39,7 @@ interface IDebondBond is IERC3475{
 
     function classLiquidity(uint256 classId) external view returns (uint256);
 
-    function classLiquidityAtNonce(uint256 classId, uint256 nonceId) external view returns (uint256);
-}
+    function classLiquidityBatch(uint256[] calldata classIds) external view returns (uint256[] calldata);
 
+    function classLiquidityAtNonce(uint256 classId, uint256 nonceId, uint256 searchNonceLimit) external view returns (uint256);
+}

@@ -17,12 +17,14 @@ pragma solidity ^0.8.0;
 
 import "./interfaces/IDebondBond.sol";
 import "./interfaces/IProgressCalculator.sol";
-import "debond-governance-contracts/utils/GovernanceOwnable.sol";
+import "./interfaces/ILiquidityRedeemable.sol";
+import "@debond-protocol/debond-governance-contracts/utils/GovernanceOwnable.sol";
 
 
 contract DebondERC3475 is IDebondBond, GovernanceOwnable {
 
-    address bankAddress;
+    address bondManagerAddress;
+    address redeemableAddress;
 
     /**
     * @notice this Struct is representing the Nonce properties as an object
@@ -35,6 +37,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         uint256 _burnedSupply;
         uint256 _redeemedSupply;
         uint256 classLiquidity;
+        uint256 previousNonceIdCreated;
         mapping(uint256 => IERC3475.Values) values;
         mapping(address => uint256) balances;
         mapping(address => mapping(address => uint256)) allowances;
@@ -49,7 +52,6 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         bool exists;
         mapping(uint256 => IERC3475.Values) values;
         mapping(uint256 => IERC3475.Metadata) nonceMetadatas;
-        uint256 liquidity;
         uint256[] nonceIds;
         mapping(uint256 => Nonce) nonces; // from nonceId given
         uint256 lastNonceIdCreated;
@@ -64,18 +66,27 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
 
     constructor(address _governanceAddress) GovernanceOwnable(_governanceAddress) {}
 
-    modifier onlyBank() {
-        require(msg.sender == bankAddress, "DebondERC3475 Error: Not authorized");
+    modifier onlyBondManager() {
+        require(msg.sender == bondManagerAddress, "DebondERC3475 Error: Not authorized");
         _;
     }
 
     /**
     * @notice change the Bank Address
-    * @param _bankAddress the new bankAddress to set
+    * @param _bondManagerAddress the new bondManagerAddress to set
     */
-    function setBankAddress(address _bankAddress) onlyGovernance external {
-        require(_bankAddress != address(0), "DebondERC3475 Error: Address given is address(0)");
-        bankAddress = _bankAddress;
+    function setBondManagerAddress(address _bondManagerAddress) onlyGovernance external {
+        require(_bondManagerAddress != address(0), "DebondERC3475 Error: Address given is address(0)");
+        bondManagerAddress = _bondManagerAddress;
+    }
+
+    /**
+    * @notice change the Bank Address
+    * @param _redeemableAddress the new bankAddress to set
+    */
+    function setRedeemableAddress(address _redeemableAddress) onlyGovernance external {
+        require(_redeemableAddress != address(0), "DebondERC3475 Error: Address given is address(0)");
+        redeemableAddress = _redeemableAddress;
     }
 
 
@@ -86,7 +97,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     * @param metadataId the identifier of the metadata being created
     * @param metadata the metadata to create
     */
-    function createClassMetadata(uint metadataId, IERC3475.Metadata memory metadata) external onlyBank {
+    function createClassMetadata(uint metadataId, IERC3475.Metadata memory metadata) external onlyBondManager {
         classMetadatas[metadataId] = metadata;
     }
 
@@ -95,7 +106,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     * @param metadataIds the identifiers of the metadatas being created
     * @param metadatas the metadatas to create
     */
-    function createClassMetadataBatch(uint[] memory metadataIds, IERC3475.Metadata[] memory metadatas) external onlyBank {
+    function createClassMetadataBatch(uint[] memory metadataIds, IERC3475.Metadata[] memory metadatas) external onlyBondManager {
         require(metadataIds.length == metadatas.length, "DebondERC3475: Incorrect inputs");
         for (uint i; i < metadataIds.length; i++) {
             classMetadatas[metadataIds[i]] = metadatas[i];
@@ -110,7 +121,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     * @param metadataId the identifier of the metadata being created
     * @param metadata the metadata to create
     */
-    function createNonceMetadata(uint classId, uint metadataId, IERC3475.Metadata memory metadata) external onlyBank {
+    function createNonceMetadata(uint classId, uint metadataId, IERC3475.Metadata memory metadata) external onlyBondManager {
         require(classExists(classId), "DebondERC3475: class Id not found");
         classes[classId].nonceMetadatas[metadataId] = metadata;
     }
@@ -122,7 +133,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     * @param metadataIds the identifiers of the metadatas being created
     * @param metadatas the metadatas to create
     */
-    function createNonceMetadataBatch(uint classId, uint[] memory metadataIds, IERC3475.Metadata[] memory metadatas) external onlyBank {
+    function createNonceMetadataBatch(uint classId, uint[] memory metadataIds, IERC3475.Metadata[] memory metadatas) external onlyBondManager {
         require(classExists(classId), "DebondERC3475: class Id not found");
         require(metadataIds.length == metadatas.length, "DebondERC3475: Incorrect inputs");
         for (uint i; i < metadataIds.length; i++) {
@@ -137,7 +148,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     * @param to the address to issue bonds to
     * @param transactions represent the classIds, nonces and amounts that need to be issued
     */
-    function issue(address to, Transaction[] calldata transactions) external override onlyBank {
+    function issue(address to, Transaction[] calldata transactions) external override onlyBondManager {
         for (uint i; i < transactions.length; i++) {
             uint classId = transactions[i].classId;
             uint nonceId = transactions[i].nonceId;
@@ -148,10 +159,9 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
             _issue(to, classId, nonceId, amount);
 
             Class storage class = classes[classId];
-            class.liquidity += amount;
 
             Nonce storage nonce = class.nonces[nonceId];
-            nonce.classLiquidity = class.liquidity;
+            nonce.classLiquidity += amount;
         }
         emit Issue(msg.sender, to, transactions);
     }
@@ -163,7 +173,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     * @param metadataIds identifiers of the metadatas (keys for values)
     * @param values value collection
     */
-    function createClass(uint256 classId, uint256[] calldata metadataIds, IERC3475.Values[] calldata values) external onlyBank {
+    function createClass(uint256 classId, uint256[] calldata metadataIds, IERC3475.Values[] calldata values) external onlyBondManager {
         require(metadataIds.length == values.length, "ERC3475: inputs error");
         require(!classExists(classId), "ERC3475: cannot create a class that already exists");
         Class storage class = classes[classId];
@@ -182,7 +192,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     * @param metadataIds identifiers of the metadatas (keys for values)
     * @param values value collection
     */
-    function createNonce(uint256 classId, uint256 nonceId, uint256[] calldata metadataIds, IERC3475.Values[] calldata values) external onlyBank {
+    function createNonce(uint256 classId, uint256 nonceId, uint256[] calldata metadataIds, IERC3475.Values[] calldata values) external onlyBondManager {
         require(metadataIds.length == values.length, "ERC3475: inputs error");
         require(classExists(classId), "DebondERC3475: class Id not found");
         Class storage class = classes[classId];
@@ -192,22 +202,15 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
 
         nonce.id = nonceId;
         nonce.exists = true;
+        // we mark the new created nonce liquidity with the actual class liquidity
+        nonce.classLiquidity = classLiquidity(classId);
+        classes[classId].nonceIds.push(nonceId);
         for (uint256 i; i < metadataIds.length; i++) {
             class.nonces[nonceId].values[metadataIds[i]] = values[i];
         }
-    }
-
-    /**
-    * @notice update the last nonce informations
-    * @param classId id of the class
-    * @param newNonceId new last nonce id created
-    * @param createdAt timestamp of the creation
-    */
-    function updateLastNonce(uint classId, uint newNonceId, uint createdAt) external onlyBank {
-        Class storage class = classes[classId];
-        require(class.exists, "DebondERC3475: class id given not found");
-        class.lastNonceIdCreated = newNonceId;
-        class.lastNonceIdCreatedTimestamp = createdAt;
+        // now we set the created nonceId as the new last nonceId created
+        class.lastNonceIdCreated = nonceId;
+        class.lastNonceIdCreatedTimestamp = block.timestamp;
     }
 
     /**
@@ -254,20 +257,22 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     /**
     * @notice redeem bonds
     * @param from address to redeem bonds from
-    * @param transactions classIds, nonceIds and amounts
+    * @param _transactions IERC3475 transaction collection
     */
-    function redeem(address from, Transaction[] calldata transactions) external override onlyBank {
-        for (uint i; i < transactions.length; i++) {
-            uint classId = transactions[i].classId;
-            uint nonceId = transactions[i].nonceId;
-            uint amount = transactions[i].amount;
+    function redeem(address from, Transaction[] calldata _transactions) external override {
+        for (uint i; i < _transactions.length; i++) {
+            uint classId = _transactions[i].classId;
+            uint nonceId = _transactions[i].nonceId;
+            uint amount = _transactions[i].amount;
             require(classes[classId].nonces[nonceId].exists, "ERC3475: given Nonce doesn't exist");
             require(from != address(0), "ERC3475: can't transfer to the zero address");
             (, uint256 progressRemaining) = getProgress(classId, nonceId);
             require(progressRemaining == 0, "Bond is not redeemable");
             _redeem(from, classId, nonceId, amount);
         }
-        emit Redeem(msg.sender, from, transactions);
+        // liquidity backing the bonds transfers
+        ILiquidityRedeemable(redeemableAddress).redeemLiquidity(from, _transactions);
+        emit Redeem(msg.sender, from, _transactions);
     }
 
     /**
@@ -275,7 +280,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     * @param from address to burn bonds from
     * @param transactions classIds, nonceIds and amounts
     */
-    function burn(address from, Transaction[] calldata transactions) external override onlyBank {
+    function burn(address from, Transaction[] calldata transactions) external override onlyBondManager {
         require(from != address(0), "ERC3475: can't transfer to the zero address");
         for (uint i; i < transactions.length; i++) {
             require(msg.sender == from || isApprovedFor(from, msg.sender), "ERC3475: caller is not owner nor approved");
@@ -338,7 +343,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     // READS
 
     function getProgress(uint256 classId, uint256 nonceId) public view returns (uint256 progressAchieved, uint256 progressRemaining) {
-        return IProgressCalculator(bankAddress).getProgress(classId, nonceId);
+        return IProgressCalculator(bondManagerAddress).getProgress(classId, nonceId);
     }
 
     function getLastNonceCreated(uint classId) external view returns (uint nonceId, uint createdAt) {
@@ -349,47 +354,6 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         return (nonceId, createdAt);
     }
 
-    function batchActiveSupply(uint256 classId) public view returns (uint256) {
-        uint256 _batchActiveSupply;
-        uint256[] memory nonces = classes[classId].nonceIds;
-        // _lastBondNonces can be recovered from the last message of the nonceId
-        // @drisky we can indeed
-        for (uint256 i = 0; i <= nonces.length; i++) {
-            _batchActiveSupply += activeSupply(classId, nonces[i]);
-        }
-        return _batchActiveSupply;
-    }
-
-    function batchBurnedSupply(uint256 classId) public view returns (uint256) {
-        uint256 _batchBurnedSupply;
-        uint256[] memory nonces = classes[classId].nonceIds;
-
-        for (uint256 i = 0; i <= nonces.length; i++) {
-            _batchBurnedSupply += burnedSupply(classId, nonces[i]);
-        }
-        return _batchBurnedSupply;
-    }
-
-    function batchRedeemedSupply(uint256 classId) public view returns (uint256) {
-        uint256 _batchRedeemedSupply;
-        uint256[] memory nonces = classes[classId].nonceIds;
-
-        for (uint256 i = 0; i <= nonces.length; i++) {
-            _batchRedeemedSupply += redeemedSupply(classId, nonces[i]);
-        }
-        return _batchRedeemedSupply;
-    }
-
-    function batchTotalSupply(uint256 classId) public view returns (uint256) {
-        uint256 _batchTotalSupply;
-        uint256[] memory nonces = classes[classId].nonceIds;
-
-        for (uint256 i = 0; i <= nonces.length; i++) {
-            _batchTotalSupply += totalSupply(classId, nonces[i]);
-        }
-        return _batchTotalSupply;
-    }
-
     function classExists(uint256 classId) public view returns (bool) {
         return classes[classId].exists;
     }
@@ -398,17 +362,43 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
         return classes[classId].nonces[nonceId].exists;
     }
 
-    function classLiquidity(uint256 classId) external view returns (uint256) {
-        return classes[classId].liquidity;
+    function classLiquidity(uint256 classId) public view returns (uint256) {
+        return classes[classId].nonces[classes[classId].lastNonceIdCreated].classLiquidity;
     }
 
-    function classLiquidityAtNonce(uint256 classId, uint256 nonceId) external view returns (uint256) {
-        require(nonceExists(classId, nonceId), "DebondERC3475 Error: nonce not found");
+    function classLiquidityBatch(uint256[] calldata classIds) external view returns (uint256[] memory) {
+        uint256[] memory liquidities = new uint[](classIds.length);
+        for(uint i; i < classIds.length; i++) {
+            liquidities[i] = classLiquidity(classIds[i]);
+        }
+        return liquidities;
+    }
+    
+    function classLiquidityAtNonce(uint256 classId, uint256 nonceId, uint256 searchNonceLimit) external view returns (uint256) {
+        // if class has no liquidity it means no liquidity on any nonce
+        if(classLiquidity(classId) == 0) {
+            return 0;
+        }
+        // we check if the nonceId given is greater than the last nonce Issued
+        uint lastNonce = classes[classId].lastNonceIdCreated;
+        if(nonceId > lastNonce) {
+            return classes[classId].nonces[lastNonce].classLiquidity;
+        }
+
+        if(!nonceExists(classId, nonceId)) {
+            while(!nonceExists(classId, nonceId) && nonceId > searchNonceLimit) {
+                --nonceId;
+            }
+        }
         return classes[classId].nonces[nonceId].classLiquidity;
     }
 
     function totalSupply(uint256 classId, uint256 nonceId) public override view returns (uint256) {
-        return classes[classId].nonces[nonceId]._activeSupply + classes[classId].nonces[nonceId]._redeemedSupply;
+        return
+        classes[classId].nonces[nonceId]._activeSupply +
+        classes[classId].nonces[nonceId]._redeemedSupply +
+        classes[classId].nonces[nonceId]._burnedSupply;
+
     }
 
     function activeSupply(uint256 classId, uint256 nonceId) public override view returns (uint256) {
@@ -420,7 +410,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     }
 
     function redeemedSupply(uint256 classId, uint256 nonceId) public override view returns (uint256) {
-        return classes[classId].nonces[nonceId]._burnedSupply;
+        return classes[classId].nonces[nonceId]._redeemedSupply;
     }
 
     function balanceOf(address account, uint256 classId, uint256 nonceId) public override view returns (uint256) {
