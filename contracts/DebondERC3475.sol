@@ -75,7 +75,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     * @notice change the Bank Address
     * @param _bondManagerAddress the new bondManagerAddress to set
     */
-    function setBondManagerAddress(address _bondManagerAddress) onlyGovernance external {
+    function updateBondManagerAddress(address _bondManagerAddress) onlyGovernance external {
         require(_bondManagerAddress != address(0), "DebondERC3475 Error: Address given is address(0)");
         bondManagerAddress = _bondManagerAddress;
     }
@@ -84,7 +84,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     * @notice change the Bank Address
     * @param _redeemableAddress the new bankAddress to set
     */
-    function setRedeemableAddress(address _redeemableAddress) onlyGovernance external {
+    function updateRedeemableAddress(address _redeemableAddress) onlyGovernance external {
         require(_redeemableAddress != address(0), "DebondERC3475 Error: Address given is address(0)");
         redeemableAddress = _redeemableAddress;
     }

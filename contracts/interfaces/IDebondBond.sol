@@ -19,6 +19,10 @@ import "erc3475/IERC3475.sol";
 
 interface IDebondBond is IERC3475{
 
+    function updateBondManagerAddress(address _bondManagerAddress) external;
+
+    function updateRedeemableAddress(address _redeemableAddress) external;
+
     function createClassMetadata(uint metadataId, IERC3475.Metadata memory metadata) external;
 
     function createClassMetadataBatch(uint[] memory metadataIds, IERC3475.Metadata[] memory metadatas) external;
