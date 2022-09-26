@@ -21,7 +21,7 @@ interface IDebondBond is IERC3475{
 
     function updateBondManagerAddress(address _bondManagerAddress) external;
 
-    function updateRedeemableAddress(address _redeemableAddress) external;
+    function updateBankAddress(address _redeemableAddress) external;
 
     function createClassMetadata(uint metadataId, IERC3475.Metadata memory metadata) external;
 

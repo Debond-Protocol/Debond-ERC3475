@@ -195,13 +195,13 @@ contract('Bond', async (accounts: string[]) => {
             {classId: DBIT_FIX_6MTH_CLASS_ID, nonceId: 0, amount: web3.utils.toWei('1000')}
         ]
         // progressCalculator is bank
-        await bondContract.setBondManagerAddress(progressCalculatorContract.address);
+        await bondContract.updateBondManagerAddress(progressCalculatorContract.address);
         await bondContract.redeem(user2, transactions);
         const user2Balance = await bondContract.balanceOf(user2, DBIT_FIX_6MTH_CLASS_ID, 0);
         const redeemedSupply = await bondContract.redeemedSupply(DBIT_FIX_6MTH_CLASS_ID, 0);
         assert.isTrue(web3.utils.toWei('3000') == user2Balance.toString())
         assert.isTrue(web3.utils.toWei('1000') == redeemedSupply.toString())
-        await bondContract.setBondManagerAddress(bondManager);
+        await bondContract.updateBondManagerAddress(bondManager);
 
     })
 
