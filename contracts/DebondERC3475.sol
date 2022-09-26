@@ -18,13 +18,13 @@ pragma solidity ^0.8.0;
 import "./interfaces/IDebondBond.sol";
 import "./interfaces/IProgressCalculator.sol";
 import "./interfaces/ILiquidityRedeemable.sol";
-import "@debond-protocol/debond-governance-contracts/utils/GovernanceOwnable.sol";
+import "@debond-protocol/debond-governance-contracts/utils/ExecutableOwnable.sol";
 
 
-contract DebondERC3475 is IDebondBond, GovernanceOwnable {
+contract DebondERC3475 is IDebondBond, ExecutableOwnable {
 
     address bondManagerAddress;
-    address redeemableAddress;
+    address bankAddress;
 
     /**
     * @notice this Struct is representing the Nonce properties as an object
@@ -64,7 +64,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
 
 
 
-    constructor(address _governanceAddress) GovernanceOwnable(_governanceAddress) {}
+    constructor(address _executableAddress) ExecutableOwnable(_executableAddress) {}
 
     modifier onlyBondManager() {
         require(msg.sender == bondManagerAddress, "DebondERC3475 Error: Not authorized");
@@ -75,18 +75,18 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
     * @notice change the Bank Address
     * @param _bondManagerAddress the new bondManagerAddress to set
     */
-    function setBondManagerAddress(address _bondManagerAddress) onlyGovernance external {
+    function updateBondManagerAddress(address _bondManagerAddress) onlyExecutable external {
         require(_bondManagerAddress != address(0), "DebondERC3475 Error: Address given is address(0)");
         bondManagerAddress = _bondManagerAddress;
     }
 
     /**
     * @notice change the Bank Address
-    * @param _redeemableAddress the new bankAddress to set
+    * @param _bankAddress the new bankAddress to set
     */
-    function setRedeemableAddress(address _redeemableAddress) onlyGovernance external {
-        require(_redeemableAddress != address(0), "DebondERC3475 Error: Address given is address(0)");
-        redeemableAddress = _redeemableAddress;
+    function updateBankAddress(address _bankAddress) onlyExecutable external {
+        require(_bankAddress != address(0), "DebondERC3475 Error: Address given is address(0)");
+        bankAddress = _bankAddress;
     }
 
 
@@ -271,7 +271,7 @@ contract DebondERC3475 is IDebondBond, GovernanceOwnable {
             _redeem(from, classId, nonceId, amount);
         }
         // liquidity backing the bonds transfers
-        ILiquidityRedeemable(redeemableAddress).redeemLiquidity(from, _transactions);
+        ILiquidityRedeemable(bankAddress).redeemLiquidity(from, _transactions);
         emit Redeem(msg.sender, from, _transactions);
     }
 

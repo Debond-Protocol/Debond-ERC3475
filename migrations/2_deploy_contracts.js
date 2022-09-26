@@ -8,11 +8,11 @@ module.exports = async function (deployer, networks, accounts) {
   await deployer.deploy(DebondBond, governanceAddress)
 
   const debondBondContract = await DebondBond.deployed();
-  await debondBondContract.setBondManagerAddress(bondManagerAddress, {from: governanceAddress});
+  await debondBondContract.updateBondManagerAddress(bondManagerAddress, {from: governanceAddress});
   await deployer.deploy(ProgressCalculator, debondBondContract.address);
   await deployer.deploy(LiquidityRedeemable, debondBondContract.address);
   const liquidityRedeemableContract = await LiquidityRedeemable.deployed();
-  await debondBondContract.setRedeemableAddress(liquidityRedeemableContract.address, {from: governanceAddress});
+  await debondBondContract.updateBankAddress(liquidityRedeemableContract.address, {from: governanceAddress});
 
 
 };
