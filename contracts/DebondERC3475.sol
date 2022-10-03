@@ -52,7 +52,6 @@ contract DebondERC3475 is IDebondBond, ExecutableOwnable {
         bool exists;
         mapping(uint256 => IERC3475.Values) values;
         mapping(uint256 => IERC3475.Metadata) nonceMetadatas;
-        uint256[] nonceIds;
         mapping(uint256 => Nonce) nonces; // from nonceId given
         uint256 lastNonceIdCreated;
         uint256 lastNonceIdCreatedTimestamp;
@@ -149,18 +148,16 @@ contract DebondERC3475 is IDebondBond, ExecutableOwnable {
     * @param transactions represent the classIds, nonces and amounts that need to be issued
     */
     function issue(address to, Transaction[] calldata transactions) external override onlyBondManager {
+        require(to != address(0), "ERC3475: can't transfer to the zero address");
         for (uint i; i < transactions.length; i++) {
             uint classId = transactions[i].classId;
             uint nonceId = transactions[i].nonceId;
             uint amount = transactions[i].amount;
             require(classes[classId].exists, "ERC3475: only issue bond that has been created");
             require(classes[classId].nonces[nonceId].exists, "ERC-3475: nonceId given not found!");
-            require(to != address(0), "ERC3475: can't transfer to the zero address");
             _issue(to, classId, nonceId, amount);
 
-            Class storage class = classes[classId];
-
-            Nonce storage nonce = class.nonces[nonceId];
+            Nonce storage nonce = classes[classId].nonces[nonceId];
             nonce.classLiquidity += amount;
         }
         emit Issue(msg.sender, to, transactions);
@@ -204,7 +201,6 @@ contract DebondERC3475 is IDebondBond, ExecutableOwnable {
         nonce.exists = true;
         // we mark the new created nonce liquidity with the actual class liquidity
         nonce.classLiquidity = classLiquidity(classId);
-        classes[classId].nonceIds.push(nonceId);
         for (uint256 i; i < metadataIds.length; i++) {
             class.nonces[nonceId].values[metadataIds[i]] = values[i];
         }
@@ -260,6 +256,7 @@ contract DebondERC3475 is IDebondBond, ExecutableOwnable {
     * @param _transactions IERC3475 transaction collection
     */
     function redeem(address from, Transaction[] calldata _transactions) external override {
+        require(from == msg.sender, "DebbondERC3475: Not Authorised");
         for (uint i; i < _transactions.length; i++) {
             uint classId = _transactions[i].classId;
             uint nonceId = _transactions[i].nonceId;
@@ -322,6 +319,7 @@ contract DebondERC3475 is IDebondBond, ExecutableOwnable {
     }
 
     function _issue(address to, uint256 classId, uint256 nonceId, uint256 amount) internal {
+        require(amount > 0, "DebondERC3475: amount must be greater than 0");
         classes[classId].nonces[nonceId].balances[to] += amount;
         classes[classId].nonces[nonceId]._activeSupply += amount;
     }
