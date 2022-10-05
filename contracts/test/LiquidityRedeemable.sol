@@ -20,7 +20,7 @@ contract LiquidityRedeemable is ILiquidityRedeemable {
         _;
     }
 
-    function redeemLiquidity(address _from, IERC3475.Transaction[] calldata _transactions) external onlyDebondBond {
+    function redeemLiquidity(address _to, IERC3475.Transaction[] calldata _transactions) external onlyDebondBond {
         return;
     }
 }

@@ -18,5 +18,5 @@ import "erc3475/IERC3475.sol";
 
 interface ILiquidityRedeemable {
 
-    function redeemLiquidity(address from, IERC3475.Transaction[] calldata transactions) external;
+    function redeemLiquidity(address to, IERC3475.Transaction[] calldata transactions) external;
 }
