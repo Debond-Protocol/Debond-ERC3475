@@ -20,8 +20,4 @@ contract ProgressCalculator is IProgressCalculator {
         progressAchieved = 100;
         progressRemaining = 0;
     }
-
-    function redeem(address from, IERC3475.Transaction[] calldata transactions) external {
-        DebondERC3475(bondContract).redeem(from, transactions);
-    }
 }
